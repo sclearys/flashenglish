@@ -1,0 +1,18 @@
+{
+  "name": "FlashEnglish",
+  "short_name": "FlashEnglish",
+  "description": "Practica traducción español → inglés con tarjetas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF7A45",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
