@@ -1,37 +1,27 @@
 import { Perfil } from "./types";
-import { TOTAL_FRASES_MVP } from "./sesion";
+import { porcentajeBloque, totalFrasesEnBloque } from "./catalogo";
 
-const BLOQUES_MVP = ["BASIC1", "BASIC2"];
-
+/** Stats del bloque activo del perfil, para la home y el resumen. */
 export function calcularStats(perfil: Perfil) {
-  const frasesIniciadas = BLOQUES_MVP.reduce(
-    (suma, bloque) => suma + (perfil.puntero_frase_nueva[bloque] ?? 0),
-    0
-  );
-
-  const enRepaso = Object.keys(perfil.progreso_frases).filter((id) =>
-    BLOQUES_MVP.some((b) => id.startsWith(b))
+  const bloque = perfil.bloque_activo;
+  const total = totalFrasesEnBloque(bloque);
+  const puntero = perfil.puntero_frase_nueva[bloque] ?? 0;
+  const enRepaso = Object.keys(perfil.progreso_frases).filter(
+    (id) => id.startsWith(bloque + "-")
   ).length;
-
-  const aprendidas = frasesIniciadas - enRepaso;
-
-  // Porcentaje de avance en el bloque Basic (frases iniciadas / total)
-  const porcentajeBloque =
-    TOTAL_FRASES_MVP > 0
-      ? Math.round((frasesIniciadas / TOTAL_FRASES_MVP) * 100)
-      : 0;
+  const aprendidas = Math.max(0, puntero - enRepaso);
 
   return {
     aprendidas,
     enRepaso,
-    total: TOTAL_FRASES_MVP,
-    porcentajeBloque,
+    total,
+    porcentajeBloque: porcentajeBloque(perfil, bloque),
     rachaDias: perfil.racha_dias,
     aciertos_totales: perfil.aciertos_totales,
   };
 }
 
-// Devuelve temas con su conteo de apariciones en errores, ordenados de mayor a menor
+/** Temas con errores en la sesión, ordenados de mayor a menor conteo. */
 export function temasARepasar(
   respuestas: Array<{ id: string; resultado: string }>,
   obtenerFrase: (id: string) => { temas_gramaticales: string[] } | undefined

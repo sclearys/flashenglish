@@ -2,30 +2,43 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { obtenerFrasePorId } from "@/lib/sesion";
-import { temasARepasar } from "@/lib/stats";
+import { BLOQUES_ORDENADOS } from "@/lib/catalogo";
 import { RespuestaSesion } from "@/lib/types";
+
+interface TemaRepasar {
+  tema: string;
+  count: number;
+}
 
 interface ResumenData {
   total: number;
   respuestas: RespuestaSesion[];
   frases_aprendidas: number;
   en_repaso_manana: number;
+  // campos añadidos en It-5 (opcionales para compatibilidad)
+  bloque?: string;
+  aprendidas_antes?: number;
+  aprendidas_despues?: number;
+  porcentaje_antes?: number;
+  porcentaje_despues?: number;
+  temas_sesion?: string[];
+  temas_repasar?: TemaRepasar[];
 }
 
-function tituloPorPorcentaje(pct: number): string {
-  if (pct >= 80) return "Buen trabajo";
-  if (pct >= 50) return "¡Sigue así!";
-  return "A practicar más";
+function emojiPorcentaje(pct: number): string {
+  if (pct >= 80) return "🎯";
+  if (pct >= 50) return "💪";
+  return "📖";
 }
 
 export default function Resumen() {
   const router = useRouter();
   const [datos, setDatos] = useState<ResumenData | null>(null);
+  const [animado, setAnimado] = useState(false);
   const inicializado = useRef(false);
 
   useEffect(() => {
-    // useRef evita que el efecto se ejecute dos veces en modo desarrollo (StrictMode)
+    // useRef evita que el efecto se ejecute dos veces en StrictMode (desarrollo)
     if (inicializado.current) return;
     inicializado.current = true;
 
@@ -33,6 +46,8 @@ export default function Resumen() {
     if (raw) {
       setDatos(JSON.parse(raw));
       localStorage.removeItem("flashenglish.resumen");
+      // Doble rAF: espera a que React pinte el estado inicial antes de animar
+      requestAnimationFrame(() => requestAnimationFrame(() => setAnimado(true)));
     } else {
       router.replace("/");
     }
@@ -51,134 +66,144 @@ export default function Resumen() {
   const casi = respuestas.filter((r) => r.resultado === "casi").length;
   const incorrectas = respuestas.filter((r) => r.resultado === "incorrecto").length;
   const porcentaje = total > 0 ? Math.round((perfectas / total) * 100) : 0;
-  const temas = temasARepasar(respuestas, obtenerFrasePorId);
 
-  // Anchos de la barra de 3 colores
-  const anchoPerfecto = total > 0 ? (perfectas / total) * 100 : 0;
-  const anchoCasi = total > 0 ? (casi / total) * 100 : 0;
-  const anchoIncorrecto = total > 0 ? (incorrectas / total) * 100 : 0;
+  const bloqueInfo = datos.bloque
+    ? BLOQUES_ORDENADOS.find((b) => b.codigo === datos.bloque)
+    : null;
+  const delta =
+    datos.aprendidas_despues !== undefined && datos.aprendidas_antes !== undefined
+      ? datos.aprendidas_despues - datos.aprendidas_antes
+      : null;
+
+  const totalFallos = datos.temas_repasar?.reduce((s, t) => s + t.count, 0) ?? 0;
 
   return (
-    <main className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10 gap-5">
+    <main className="min-h-screen bg-white flex flex-col items-center px-4 py-10">
+      <div className="w-full max-w-sm flex flex-col gap-5">
 
-      {/* Cabecera */}
-      <div className="w-full max-w-sm">
-        <p className="text-eyebrow font-semibold uppercase text-mute mb-1">
-          SESIÓN COMPLETADA
-        </p>
-        <h1 className="text-[26px] font-semibold text-ink tracking-[-0.02em]">
-          {tituloPorPorcentaje(porcentaje)}
-        </h1>
-      </div>
-
-      {/* Card de resultados con barra tricolor */}
-      <div className="w-full max-w-sm bg-brand-50 rounded-xl px-5 py-4 flex flex-col gap-3">
-        {/* Porcentaje */}
-        <div className="flex items-baseline gap-1">
-          <span className="text-[52px] font-semibold text-ink leading-none tabular-nums">
-            {porcentaje}
-          </span>
-          <span className="text-[20px] font-semibold text-ink">%</span>
-          <span className="text-sm font-medium text-body ml-1">perfectas</span>
+        {/* Cabecera */}
+        <div className="flex flex-col gap-1">
+          <span className="text-5xl leading-tight">{emojiPorcentaje(porcentaje)}</span>
+          <h1 className="text-[22px] font-semibold text-ink mt-1">Sesión completada</h1>
+          <p className="text-[13px] text-mute">{total} frases</p>
         </div>
 
-        {/* Barra tricolor */}
-        <div className="flex gap-[3px] h-2 rounded-full overflow-hidden">
-          {anchoPerfecto > 0 && (
-            <div
-              className="h-full bg-success rounded-full"
-              style={{ width: `${anchoPerfecto}%` }}
-            />
-          )}
-          {anchoCasi > 0 && (
-            <div
-              className="h-full bg-warn rounded-full"
-              style={{ width: `${anchoCasi}%` }}
-            />
-          )}
-          {anchoIncorrecto > 0 && (
-            <div
-              className="h-full bg-danger rounded-full"
-              style={{ width: `${anchoIncorrecto}%` }}
-            />
-          )}
-          {/* Fondo completo si todo es 0 */}
-          {perfectas === 0 && casi === 0 && incorrectas === 0 && (
-            <div className="h-full bg-brand-100 rounded-full w-full" />
-          )}
-        </div>
-
-        {/* Leyenda */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-body">
-            <span className="w-2 h-2 rounded-full bg-success inline-block" />
-            {perfectas} perfecto
-          </span>
-          <span className="flex items-center gap-1.5 text-xs font-medium text-body">
-            <span className="w-2 h-2 rounded-full bg-warn inline-block" />
-            {casi} casi
-          </span>
-          <span className="flex items-center gap-1.5 text-xs font-medium text-body">
-            <span className="w-2 h-2 rounded-full bg-danger inline-block" />
-            {incorrectas} incorrecto
-          </span>
-        </div>
-      </div>
-
-      {/* Dos stat cards */}
-      <div className="w-full max-w-sm grid grid-cols-2 gap-3">
-        <div className="bg-surface rounded-xl px-4 py-3 flex flex-col gap-0.5">
-          <p className="text-[28px] font-semibold text-success leading-none tabular-nums">
-            +{frases_aprendidas}
-          </p>
-          <p className="text-xs font-medium text-body mt-1">frases aprendidas</p>
-        </div>
-        <div className="bg-surface rounded-xl px-4 py-3 flex flex-col gap-0.5">
-          <p className="text-[28px] font-semibold text-brand-500 leading-none tabular-nums">
-            {en_repaso_manana}
-          </p>
-          <p className="text-xs font-medium text-body mt-1">en repaso para mañana</p>
-        </div>
-      </div>
-
-      {/* Temas a repasar */}
-      {temas.length > 0 && (
-        <div className="w-full max-w-sm flex flex-col gap-2">
-          <p className="text-eyebrow font-semibold uppercase text-mute">
-            A REPASAR
-          </p>
-          <div className="flex flex-col gap-2">
-            {temas.map(({ tema, count }) => (
-              <div
-                key={tema}
-                className="flex items-center justify-between bg-white border border-brand-100 rounded-lg px-4 py-3"
-              >
-                <p className="text-sm font-semibold text-ink">{tema}</p>
-                <span className="text-sm font-semibold text-brand-500 tabular-nums">
-                  {count}
-                </span>
-              </div>
-            ))}
+        {/* 3 chips de resultado */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col items-center gap-1 bg-success/10 rounded-xl py-3">
+            <span className="text-[22px] font-semibold text-success tabular-nums leading-none">
+              {perfectas}
+            </span>
+            <span className="text-[11px] text-success font-medium">Perfecto</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 rounded-xl py-3" style={{ backgroundColor: "#FFC85726" }}>
+            <span className="text-[22px] font-semibold tabular-nums leading-none" style={{ color: "#5C3F00" }}>
+              {casi}
+            </span>
+            <span className="text-[11px] font-medium" style={{ color: "#5C3F00" }}>Casi</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 bg-danger/10 rounded-xl py-3">
+            <span className="text-[22px] font-semibold text-danger tabular-nums leading-none">
+              {incorrectas}
+            </span>
+            <span className="text-[11px] text-danger font-medium">Fallo</span>
           </div>
         </div>
-      )}
 
-      {/* Botones */}
-      <div className="w-full max-w-sm grid grid-cols-2 gap-3">
-        <button
-          onClick={() => router.push("/")}
-          className="h-12 rounded-md bg-white border border-brand-100 text-ink text-sm font-semibold hover:border-brand-300 transition-all"
-        >
-          Terminar
-        </button>
-        <button
-          onClick={() => router.push("/sesion")}
-          className="h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
-        >
-          Siguiente sesión
-        </button>
+        {/* Card de progreso del bloque */}
+        {bloqueInfo &&
+          datos.aprendidas_antes !== undefined &&
+          datos.aprendidas_despues !== undefined &&
+          datos.porcentaje_antes !== undefined &&
+          datos.porcentaje_despues !== undefined && (
+          <div className="bg-brand-50 rounded-xl px-5 py-4 flex flex-col gap-3">
+            <p className="text-eyebrow font-semibold uppercase text-mute">TU BLOQUE</p>
+            <p className="text-[20px] font-semibold text-ink">{bloqueInfo.nombre}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-body tabular-nums">
+                {datos.aprendidas_antes} → {datos.aprendidas_despues} aprendidas
+              </p>
+              {delta !== null && delta > 0 && (
+                <span className="text-xs font-semibold text-success bg-success/10 rounded-full px-2.5 py-0.5">
+                  +{delta}
+                </span>
+              )}
+            </div>
+            <div className="h-2 rounded-full bg-brand-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-brand-500 transition-all duration-[600ms] ease-out"
+                style={{
+                  width: animado
+                    ? `${datos.porcentaje_despues}%`
+                    : `${datos.porcentaje_antes}%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-mute tabular-nums text-right">
+              {datos.porcentaje_despues}%
+            </p>
+          </div>
+        )}
+
+        {/* Por repasar */}
+        {datos.temas_repasar && datos.temas_repasar.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-eyebrow font-semibold uppercase text-mute">POR REPASAR</p>
+              <span className="text-xs font-semibold text-danger bg-danger/10 rounded-full px-2.5 py-0.5">
+                {totalFallos} {totalFallos === 1 ? "fallo" : "fallos"}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {datos.temas_repasar.map(({ tema, count }) => (
+                <div
+                  key={tema}
+                  className="flex items-center justify-between border-l-2 border-danger pl-3 py-1"
+                >
+                  <p className="text-sm font-semibold text-ink">{tema}</p>
+                  <span className="text-sm text-mute tabular-nums">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Temas de esta sesión */}
+        {datos.temas_sesion && datos.temas_sesion.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-eyebrow font-semibold uppercase text-mute">
+              TEMAS DE ESTA SESIÓN
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {datos.temas_sesion.map((tema) => (
+                <span
+                  key={tema}
+                  className="text-xs font-medium text-body bg-surface rounded-full px-3 py-1"
+                >
+                  {tema}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Botones */}
+        <div className="flex flex-col gap-2 pt-1">
+          <button
+            onClick={() => router.push("/sesion?frases=25&nueva=1")}
+            className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
+          >
+            Otra sesión
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="w-full h-12 rounded-md bg-white border border-brand-100 text-ink text-sm font-semibold hover:border-brand-300 transition-all"
+          >
+            Terminar
+          </button>
+        </div>
+
       </div>
-
     </main>
   );
 }

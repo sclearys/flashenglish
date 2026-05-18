@@ -7,9 +7,12 @@ import {
   guardarEstado,
   obtenerPerfilActivo,
   actualizarPerfilActivo,
+  avanzarBloqueActivo,
 } from "@/lib/storage";
+import { porcentajeBloque, BLOQUES_ORDENADOS, temasGrandesPorFrase } from "@/lib/catalogo";
 import { construirSesion, obtenerFrasePorId } from "@/lib/sesion";
 import { evaluarFrase, avanzarPunterosAlTerminar, actualizarRacha } from "@/lib/aprendizaje";
+import { temasARepasar } from "@/lib/stats";
 import { AppState, Frase, ResultadoEval, SesionEnCurso } from "@/lib/types";
 import FeedbackFallo from "@/components/FeedbackFallo";
 
@@ -40,25 +43,62 @@ export default function SesionInterna() {
   useEffect(() => {
     const estadoCargado = cargarEstado();
     const perfil = obtenerPerfilActivo(estadoCargado);
+    const bloqueAlIniciar = perfil.bloque_activo;
     const forzarNueva = searchParams.get("nueva") === "1";
     const tamanyoParam = parseInt(searchParams.get("frases") ?? "25", 10);
     const tamanyoSesion = [10, 15, 20, 25].includes(tamanyoParam) ? tamanyoParam : 25;
 
-    const sesionActiva =
-      !forzarNueva && perfil.sesion_en_curso
-        ? perfil.sesion_en_curso
-        : construirSesion(perfil, tamanyoSesion);
+    // Ignorar sesión guardada si es de otro bloque o está vacía
+    const sesionGuardadaValida =
+      !forzarNueva &&
+      perfil.sesion_en_curso &&
+      perfil.sesion_en_curso.frases_ids.length > 0 &&
+      perfil.sesion_en_curso.frases_ids[0].startsWith(perfil.bloque_activo + "-");
+
+    const sesionActiva = sesionGuardadaValida
+      ? perfil.sesion_en_curso!
+      : construirSesion(perfil, tamanyoSesion);
+
+    // Punto A: sesión vacía — puede ser bloque al 100% o sin frases disponibles hoy
+    if (sesionActiva.frases_ids.length === 0) {
+      const pct = porcentajeBloque(perfil, bloqueAlIniciar);
+      const hayBloqueSiguiente =
+        BLOQUES_ORDENADOS.findIndex((b) => b.codigo === bloqueAlIniciar) <
+        BLOQUES_ORDENADOS.length - 1;
+      if (pct >= 100 && hayBloqueSiguiente) {
+        // Bloque completado: limpiar sesión y avanzar
+        const perfilSinSesion = { ...perfil, sesion_en_curso: null };
+        const estadoSinSesion = actualizarPerfilActivo(estadoCargado, perfilSinSesion);
+        avanzarBloqueActivo(estadoSinSesion);
+        router.push(`/fin-de-bloque?bloque=${bloqueAlIniciar}`);
+        return;
+      }
+      // Sin frases disponibles (todo practicado hoy, o último bloque terminado)
+      // No guardar sesión vacía en localStorage
+      router.push("/");
+      return;
+    }
 
     const perfilActualizado = { ...perfil, sesion_en_curso: sesionActiva };
     const estadoActualizado = actualizarPerfilActivo(estadoCargado, perfilActualizado);
     guardarEstado(estadoActualizado);
     setEstado(estadoActualizado);
     setSesion(sesionActiva);
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const terminarSesion = useCallback(
     (estadoFinal: AppState, sesionFinal: SesionEnCurso) => {
       const perfilActual = obtenerPerfilActivo(estadoFinal);
+      const bloqueCompletado = perfilActual.bloque_activo;
+
+      // Snapshot del bloque ANTES de actualizar punteros
+      const punteroAntes = perfilActual.puntero_frase_nueva[bloqueCompletado] ?? 0;
+      const enRepasoAntes = Object.keys(perfilActual.progreso_frases).filter(
+        (id) => id.startsWith(bloqueCompletado + "-")
+      ).length;
+      const aprendidasAntes = Math.max(0, punteroAntes - enRepasoAntes);
+      const porcentajeAntes = porcentajeBloque(perfilActual, bloqueCompletado);
+
       const punterosActualizados = avanzarPunterosAlTerminar(perfilActual, sesionFinal);
       const racha = actualizarRacha(perfilActual);
       const perfilTerminado = {
@@ -71,9 +111,6 @@ export default function SesionInterna() {
       const estadoTerminado = actualizarPerfilActivo(estadoFinal, perfilTerminado);
       guardarEstado(estadoTerminado);
 
-      // Frases aprendidas esta sesión:
-      // - Nuevas evaluadas como perfecto (aprendidas a la primera)
-      // - Repaso que ya no están en progreso_frases (completaron su ciclo)
       const perfilFinal = obtenerPerfilActivo(estadoTerminado);
       const nuevasPerfectas = sesionFinal.respuestas.filter(
         (r) => r.resultado === "perfecto" && !sesionFinal.ids_repaso.includes(r.id)
@@ -84,16 +121,50 @@ export default function SesionInterna() {
       const frasesAprendidas = nuevasPerfectas + repasoCompletadas;
       const enRepasoManana = Object.keys(perfilFinal.progreso_frases).length;
 
-      localStorage.setItem(
-        "flashenglish.resumen",
-        JSON.stringify({
-          total: sesionFinal.frases_ids.length,
-          respuestas: sesionFinal.respuestas,
-          frases_aprendidas: frasesAprendidas,
-          en_repaso_manana: enRepasoManana,
-        })
-      );
+      // Snapshot del bloque DESPUÉS de actualizar punteros
+      const punteroDespues = perfilFinal.puntero_frase_nueva[bloqueCompletado] ?? 0;
+      const enRepasoDespues = Object.keys(perfilFinal.progreso_frases).filter(
+        (id) => id.startsWith(bloqueCompletado + "-")
+      ).length;
+      const aprendidasDespues = Math.max(0, punteroDespues - enRepasoDespues);
+      const porcentajeDespues = porcentajeBloque(perfilFinal, bloqueCompletado);
 
+      // Temas grandes únicos tocados en la sesión
+      const temasEnSesion = new Set<string>();
+      for (const fraseId of sesionFinal.frases_ids) {
+        for (const tema of (temasGrandesPorFrase.get(fraseId) ?? [])) {
+          temasEnSesion.add(tema);
+        }
+      }
+
+      const resumen = {
+        total: sesionFinal.frases_ids.length,
+        respuestas: sesionFinal.respuestas,
+        frases_aprendidas: frasesAprendidas,
+        en_repaso_manana: enRepasoManana,
+        bloque: bloqueCompletado,
+        aprendidas_antes: aprendidasAntes,
+        aprendidas_despues: aprendidasDespues,
+        porcentaje_antes: porcentajeAntes,
+        porcentaje_despues: porcentajeDespues,
+        temas_sesion: Array.from(temasEnSesion),
+        temas_repasar: temasARepasar(sesionFinal.respuestas, obtenerFrasePorId),
+      };
+
+      // Punto B: detectar si esta sesión completó el bloque activo
+      const pct = porcentajeBloque(perfilFinal, bloqueCompletado);
+      const hayBloqueSiguiente =
+        BLOQUES_ORDENADOS.findIndex((b) => b.codigo === bloqueCompletado) <
+        BLOQUES_ORDENADOS.length - 1;
+
+      if (pct >= 100 && hayBloqueSiguiente) {
+        avanzarBloqueActivo(estadoTerminado);
+        localStorage.setItem("flashenglish.resumen", JSON.stringify(resumen));
+        router.push(`/fin-de-bloque?bloque=${bloqueCompletado}`);
+        return;
+      }
+
+      localStorage.setItem("flashenglish.resumen", JSON.stringify(resumen));
       router.push("/resumen");
     },
     [router]

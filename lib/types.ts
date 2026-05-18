@@ -55,12 +55,24 @@ export interface SesionEnCurso {
 
 export type PunteroBloque = Record<string, number>;
 
+export interface StatsDia {
+  fecha: string;       // "YYYY-MM-DD"
+  perfecto: number;
+  casi: number;
+  incorrecto: number;
+}
+
 export interface Perfil {
   nombre: string;
   creado: string;
   racha_dias: number;
   ultima_sesion_fecha: string | null;
   aciertos_totales: number;
+  bloque_activo: string;               // código del bloque activo ("BASIC1", "INT2", etc.)
+  bloques_desbloqueados: string[];     // códigos de bloques accesibles para este perfil
+  color_acento: string;                // hex — por defecto "#FF7A45", usado en pieza B
+  avatar: string;                      // opaco — por defecto "default", usado en pieza B
+  stats_dia: StatsDia | null;          // stats acumuladas del día actual
   puntero_frase_nueva: PunteroBloque;
   progreso_frases: Record<string, ProgresoFrase>;
   sesion_en_curso: SesionEnCurso | null;

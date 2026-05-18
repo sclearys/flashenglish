@@ -4,18 +4,22 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cargarEstado, obtenerPerfilActivo } from "@/lib/storage";
 import { calcularStats } from "@/lib/stats";
+import { BLOQUES_ORDENADOS, porcentajeBloque } from "@/lib/catalogo";
+import { hayFrasesDisponibles, contarRepasoMañana } from "@/lib/sesion";
 import { AppState } from "@/lib/types";
-
-const OPCIONES_FRASES = [10, 15, 20, 25];
+import BarraOchoSegmentos from "@/components/BarraOchoSegmentos";
 
 export default function Inicio() {
   const router = useRouter();
   const [estado, setEstado] = useState<AppState | null>(null);
-  const [frasesPorSesion, setFrasesPorSesion] = useState(25);
 
   useEffect(() => {
+    if (!sessionStorage.getItem("perfilSeleccionado")) {
+      router.push("/perfiles");
+      return;
+    }
     setEstado(cargarEstado());
-  }, []);
+  }, [router]);
 
   if (!estado) {
     return (
@@ -27,133 +31,155 @@ export default function Inicio() {
 
   const perfil = obtenerPerfilActivo(estado);
   const stats = calcularStats(perfil);
-  const haySessionEnCurso = perfil.sesion_en_curso !== null;
+  const haySessionEnCurso =
+    perfil.sesion_en_curso !== null &&
+    perfil.sesion_en_curso.frases_ids.length > 0;
+  const frasesDisponibles = hayFrasesDisponibles(perfil);
+  const repasoParaMañana = frasesDisponibles ? 0 : contarRepasoMañana(perfil);
   const rachaTxt = stats.rachaDias === 1 ? "día" : "días";
+
+  const bloqueActualInfo = BLOQUES_ORDENADOS.find(
+    (b) => b.codigo === perfil.bloque_activo
+  );
+
+  const segmentos = BLOQUES_ORDENADOS.map((b) => ({
+    codigo: b.codigo,
+    porcentaje: porcentajeBloque(perfil, b.codigo),
+    esActivo: b.codigo === perfil.bloque_activo,
+    desbloqueado: perfil.bloques_desbloqueados.includes(b.codigo),
+  }));
+
+  function irAPerfiles() {
+    sessionStorage.removeItem("perfilSeleccionado");
+    router.push("/perfiles");
+  }
 
   function empezar(nueva = false) {
     const params = new URLSearchParams();
-    params.set("frases", String(frasesPorSesion));
+    params.set("frases", "25");
     if (nueva) params.set("nueva", "1");
     router.push(`/sesion?${params.toString()}`);
   }
 
   return (
-    <main className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10 gap-5">
+    <main className="min-h-screen bg-white flex flex-col items-center px-4 py-8 gap-5">
+      <div className="w-full max-w-sm flex flex-col gap-5">
 
-      {/* Cabecera */}
-      <div className="w-full max-w-sm">
-        <p className="text-eyebrow font-semibold uppercase text-mute mb-1">
-          FLASHENGLISH
-        </p>
-        <h1 className="text-[26px] font-semibold text-ink tracking-[-0.02em]">
-          Listo para una nueva sesión
-        </h1>
-      </div>
-
-      {/* Card de racha */}
-      <div className="w-full max-w-sm bg-brand-50 rounded-xl px-5 py-4 flex items-center gap-4">
-        <span className="text-[32px]">🔥</span>
-        <div>
-          <p className="text-[22px] font-semibold text-ink tabular-nums leading-none">
-            {stats.rachaDias} {rachaTxt}
-          </p>
-          <p className="text-sm font-medium text-mute mt-0.5">de racha</p>
-        </div>
-      </div>
-
-      {/* Bloque Basic + barra de progreso */}
-      <div className="w-full max-w-sm flex flex-col gap-2">
+        {/* Cabecera: perfil activo + racha */}
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-ink">Bloque Basic</p>
-          <p className="text-sm font-medium text-mute tabular-nums">
-            {stats.porcentajeBloque}%
-          </p>
-        </div>
-        {/* Barra de progreso */}
-        <div className="w-full flex gap-[3px]">
-          <div
-            className="h-1.5 rounded-full bg-brand-500 transition-all duration-[400ms] ease-out"
-            style={{ width: `${Math.max(stats.porcentajeBloque, stats.porcentajeBloque > 0 ? 2 : 0)}%` }}
-          />
-          <div className="h-1.5 rounded-full bg-brand-100 flex-1" />
-        </div>
-
-        {/* Stats: aprendidas · en repaso · total */}
-        <div className="flex items-center gap-6 mt-1">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[20px] font-semibold text-success tabular-nums leading-none">
-              {stats.aprendidas}
-            </p>
-            <p className="text-eyebrow font-semibold uppercase text-mute">
-              APRENDIDAS
-            </p>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[20px] font-semibold text-brand-500 tabular-nums leading-none">
-              {stats.enRepaso}
-            </p>
-            <p className="text-eyebrow font-semibold uppercase text-mute">
-              EN REPASO
-            </p>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[20px] font-semibold text-body tabular-nums leading-none">
-              {stats.total}
-            </p>
-            <p className="text-eyebrow font-semibold uppercase text-mute">
-              TOTAL
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Selector de frases por sesión */}
-      <div className="w-full max-w-sm flex flex-col gap-2">
-        <p className="text-eyebrow font-semibold uppercase text-mute">
-          FRASES POR SESIÓN
-        </p>
-        <div className="grid grid-cols-4 gap-2">
-          {OPCIONES_FRASES.map((n) => (
-            <button
-              key={n}
-              onClick={() => setFrasesPorSesion(n)}
-              className={`h-11 rounded-md text-sm font-semibold transition-all ${
-                frasesPorSesion === n
-                  ? "bg-brand-500 text-white"
-                  : "bg-white border border-brand-100 text-ink hover:border-brand-300"
-              }`}
+          <button
+            onClick={irAPerfiles}
+            className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+              style={{ background: perfil.color_acento }}
             >
-              {n}
-            </button>
-          ))}
+              {perfil.nombre[0].toUpperCase()}
+            </div>
+            <span className="text-[18px] font-semibold text-ink">{perfil.nombre}</span>
+          </button>
+          <div className="flex items-center gap-1.5 bg-brand-50 rounded-full px-3 py-1">
+            <span className="text-base">🔥</span>
+            <span className="text-sm font-semibold text-ink tabular-nums">
+              {stats.rachaDias} {rachaTxt}
+            </span>
+          </div>
         </div>
+
+        {/* Card del bloque activo */}
+        <div className="bg-brand-50 rounded-xl px-5 py-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-eyebrow font-semibold uppercase text-mute">TU BLOQUE</p>
+            <p className="text-[22px] font-semibold text-ink leading-tight">
+              {bloqueActualInfo?.nombre ?? perfil.bloque_activo}
+            </p>
+          </div>
+
+          {/* Barra de progreso del bloque activo */}
+          <div className="flex flex-col gap-1.5">
+            <div className="w-full h-2 rounded-full bg-surface overflow-hidden">
+              <div
+                className="h-full bg-brand-500 rounded-full transition-all duration-[400ms] ease-out"
+                style={{ width: `${stats.porcentajeBloque}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-mute tabular-nums">
+                {stats.aprendidas} / {stats.total} aprendidas
+              </p>
+              <p className="text-sm font-semibold text-ink tabular-nums">
+                {stats.porcentajeBloque}%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA principal */}
+        {haySessionEnCurso ? (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => empezar(false)}
+              className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all flex items-center justify-center gap-2"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>
+              Continuar sesión ({perfil.sesion_en_curso!.indice_actual}/{perfil.sesion_en_curso!.frases_ids.length})
+            </button>
+            <button
+              onClick={() => empezar(true)}
+              className="w-full h-12 rounded-md bg-white border border-brand-100 text-brand-700 text-sm font-semibold hover:border-brand-300 transition-all"
+            >
+              Empezar sesión nueva
+            </button>
+          </div>
+        ) : frasesDisponibles ? (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => empezar()}
+              className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all flex items-center justify-center gap-2"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>
+              Empezar sesión
+            </button>
+            <button
+              onClick={() => router.push("/test-nivel")}
+              className="text-sm font-medium text-mute hover:text-ink transition-colors text-center py-1"
+            >
+              ¿Ya sabes inglés? → Haz el test de nivel
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <button
+              disabled
+              className="w-full h-12 rounded-md bg-brand-100 text-mute text-sm font-semibold cursor-not-allowed"
+            >
+              Empezar sesión
+            </button>
+            {repasoParaMañana > 0 && (
+              <p className="text-center text-sm text-mute">
+                {repasoParaMañana} {repasoParaMañana === 1 ? "frase espera" : "frases esperan"} mañana
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Tu camino: barra de 8 segmentos */}
+        <div className="flex flex-col gap-2">
+          <p className="text-eyebrow font-semibold uppercase text-mute">TU CAMINO</p>
+          <BarraOchoSegmentos segmentos={segmentos} mostrarLabels />
+        </div>
+
       </div>
 
-      {/* Botones de acción */}
-      {haySessionEnCurso ? (
-        <div className="w-full max-w-sm flex flex-col gap-3">
-          <button
-            onClick={() => empezar(false)}
-            className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
-          >
-            Continuar sesión ({perfil.sesion_en_curso!.indice_actual}/{perfil.sesion_en_curso!.frases_ids.length})
-          </button>
-          <button
-            onClick={() => empezar(true)}
-            className="w-full h-12 rounded-md bg-white border border-brand-100 text-brand-700 text-sm font-semibold hover:border-brand-300 transition-all"
-          >
-            Empezar sesión nueva
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => empezar()}
-          className="w-full max-w-sm h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
-        >
-          Empezar sesión
-        </button>
-      )}
-
+      {/* Link a Mi trayectoria */}
+      <button
+        onClick={() => router.push("/mi-trayectoria")}
+        className="flex items-center gap-1.5 text-sm font-medium text-mute hover:text-ink transition-colors mt-2"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+        Mi trayectoria
+      </button>
     </main>
   );
 }
