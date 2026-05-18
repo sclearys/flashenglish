@@ -180,6 +180,7 @@ export function eliminarPerfil(estado: AppState, perfilId: string): AppState {
   const ids = Object.keys(estado.perfiles);
   if (ids.length <= 1) return estado; // no borrar el último
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { [perfilId]: _eliminado, ...restPerfiles } = estado.perfiles;
   const nuevoActivo =
     estado.perfil_activo === perfilId

@@ -61,7 +61,7 @@ export default function Resumen() {
     );
   }
 
-  const { total, respuestas, frases_aprendidas, en_repaso_manana } = datos;
+  const { total, respuestas } = datos;
   const perfectas = respuestas.filter((r) => r.resultado === "perfecto").length;
   const casi = respuestas.filter((r) => r.resultado === "casi").length;
   const incorrectas = respuestas.filter((r) => r.resultado === "incorrecto").length;
