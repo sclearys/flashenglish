@@ -133,21 +133,13 @@ export default function Inicio() {
             </button>
           </div>
         ) : frasesDisponibles ? (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => empezar()}
-              className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all flex items-center justify-center gap-2"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>
-              Empezar sesión
-            </button>
-            <button
-              onClick={() => router.push("/test-nivel")}
-              className="text-sm font-medium text-mute hover:text-ink transition-colors text-center py-1"
-            >
-              ¿Ya sabes inglés? → Haz el test de nivel
-            </button>
-          </div>
+          <button
+            onClick={() => empezar()}
+            className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all flex items-center justify-center gap-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>
+            Empezar sesión
+          </button>
         ) : (
           <div className="flex flex-col gap-3">
             <button
@@ -163,6 +155,24 @@ export default function Inicio() {
             )}
           </div>
         )}
+
+        {/* Links de ayuda — agrupados, siempre visibles */}
+        <div className="flex flex-col items-center gap-1">
+          {frasesDisponibles && !haySessionEnCurso && (
+            <button
+              onClick={() => router.push("/test-nivel")}
+              className="text-sm font-medium text-mute hover:text-ink transition-colors text-center py-1"
+            >
+              ¿Ya sabes inglés? → Haz el test de nivel
+            </button>
+          )}
+          <button
+            onClick={() => router.push("/como-funciona")}
+            className="text-sm font-medium text-mute hover:text-ink transition-colors text-center py-1"
+          >
+            Cómo funciona
+          </button>
+        </div>
 
         {/* Tu camino: barra de 8 segmentos */}
         <div className="flex flex-col gap-2">

@@ -15,12 +15,12 @@ import { evaluarFrase, avanzarPunterosAlTerminar, actualizarRacha } from "@/lib/
 import { temasARepasar } from "@/lib/stats";
 import { AppState, Frase, ResultadoEval, SesionEnCurso } from "@/lib/types";
 import FeedbackFallo from "@/components/FeedbackFallo";
+import { leerFraseEnIngles, detenerAudio, tieneWebSpeech } from "@/lib/audio";
 
 type Pantalla = "tarjeta" | "feedback";
 
 interface DatosFeedback {
   resultado: ResultadoEval;
-  pendientes: number;
   frase: Frase;
 }
 
@@ -39,6 +39,27 @@ export default function SesionInterna() {
     estado: AppState;
     sesion: SesionEnCurso;
   } | null>(null);
+
+  // Soporte de Web Speech API — se detecta en cliente, nunca en SSR
+  const [speechDisponible, setSpeechDisponible] = useState(false);
+  useEffect(() => {
+    setSpeechDisponible(tieneWebSpeech());
+  }, []);
+
+  // Leer la respuesta en inglés automáticamente al revelar (y también al retroceder)
+  useEffect(() => {
+    if (!sesion || !revelada) return;
+    const fraseId = sesion.frases_ids[sesion.indice_actual];
+    const frase = obtenerFrasePorId(fraseId);
+    if (frase) leerFraseEnIngles(frase.en);
+  // sesion.indice_actual + revelada cubren todos los casos: revelar, retroceder, avanzar
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion?.indice_actual, revelada]);
+
+  // Detener audio al salir de la pantalla de sesión
+  useEffect(() => {
+    return () => { detenerAudio(); };
+  }, []);
 
   useEffect(() => {
     const estadoCargado = cargarEstado();
@@ -172,6 +193,8 @@ export default function SesionInterna() {
 
   const avanzarTarjeta = useCallback(
     (estadoActual: AppState, sesionActual: SesionEnCurso) => {
+      // Cortar el audio de la tarjeta anterior antes de pasar a la siguiente
+      detenerAudio();
       const siguienteIndice = sesionActual.indice_actual + 1;
 
       if (siguienteIndice >= sesionActual.frases_ids.length) {
@@ -234,10 +257,8 @@ export default function SesionInterna() {
         avanzarTarjeta(estadoActualizado, sesionConRespuesta);
       }, 250);
     } else {
-      const progreso = perfilActualizado.progreso_frases[fraseId];
       setDatosFeedback({
         resultado,
-        pendientes: progreso?.pendientes ?? (resultado === "casi" ? 2 : 3),
         frase: fraseActual!,
       });
       setPantalla("feedback");
@@ -303,23 +324,45 @@ export default function SesionInterna() {
           traduccionIngles={datosFeedback.frase.en}
           temasGramaticales={datosFeedback.frase.temas_gramaticales}
           resultado={datosFeedback.resultado}
-          pendientes={datosFeedback.pendientes}
           onContinuar={() => avanzarTarjeta(estado, sesion)}
         />
       ) : (
         // key en el wrapper: cuando cambia la frase, React re-monta y dispara el slide-in
         <div key={fraseActualId} className="w-full flex flex-col items-center animate-slide-in">
           <div className={`w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-3 ${animandoPerfecto ? "animate-scale-perfecto" : ""}`}>
-            <span className="text-eyebrow font-semibold uppercase text-mute">TRADUCE</span>
+            <span className="text-eyebrow font-semibold uppercase text-mute">DILO EN VOZ ALTA</span>
             <p className="text-[18px] font-semibold text-body leading-snug">{fraseActual.es}</p>
           </div>
 
           {revelada && (
             <div className={`w-full max-w-sm bg-brand-100 rounded-lg px-[14px] py-[18px] border border-brand-500/20 flex flex-col gap-2 mb-6 ${animandoPerfecto ? "animate-scale-perfecto" : ""}`}>
               <span className="text-eyebrow font-semibold uppercase text-brand-700">ENGLISH</span>
-              <p className="text-[18px] font-semibold text-ink leading-snug">
-                {fraseActual.en}
-              </p>
+              {/* Frase en inglés + botón de repetir inline a la derecha */}
+              <div className="flex items-center gap-2">
+                <p className="text-[18px] font-semibold text-ink leading-snug flex-1">
+                  {fraseActual.en}
+                </p>
+                {speechDisponible && (
+                  <button
+                    onClick={() => leerFraseEnIngles(fraseActual.en)}
+                    className="shrink-0 text-mute hover:text-ink transition-colors"
+                    aria-label="Escuchar pronunciación"
+                  >
+                    {/* Altavoz con ondas de sonido */}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {/* Fallback: solo se muestra si el navegador no soporta Web Speech */}
+              {!speechDisponible && (
+                <p className="text-[13px] font-normal text-mute">
+                  Tu navegador no reproduce audio
+                </p>
+              )}
             </div>
           )}
 

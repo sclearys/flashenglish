@@ -8,7 +8,6 @@ interface Props {
   traduccionIngles: string;
   temasGramaticales: string[];
   resultado: ResultadoEval; // "casi" o "incorrecto"
-  pendientes: number;       // cuántas veces más hay que acertarla
   onContinuar: () => void;
 }
 
@@ -18,7 +17,6 @@ export default function FeedbackFallo({
   fraseEspanol,
   traduccionIngles,
   temasGramaticales,
-  pendientes,
   onContinuar,
 }: Props) {
   const [segundosRestantes, setSegundosRestantes] = useState(DURACION_SEGUNDOS);
@@ -43,7 +41,7 @@ export default function FeedbackFallo({
       {/* Frase en español */}
       <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[18px] flex flex-col gap-2">
         <span className="text-eyebrow font-semibold uppercase text-mute">
-          TRADUCE
+          DILO EN VOZ ALTA
         </span>
         <p className="text-[15px] font-semibold text-body leading-snug">
           {fraseEspanol}
@@ -81,11 +79,9 @@ export default function FeedbackFallo({
           ))}
         </div>
 
-        {/* Mensaje colaborativo */}
+        {/* Mensaje colaborativo — no comunicamos cuántas veces se repite (política de copy) */}
         <p className="text-sm font-medium text-body mt-1">
-          La repasaremos{" "}
-          <span className="font-semibold text-ink">{pendientes}</span>{" "}
-          {pendientes === 1 ? "vez más" : "veces más"}
+          La repasaremos en próximos días
         </p>
       </div>
 
