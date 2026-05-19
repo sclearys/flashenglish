@@ -41,7 +41,7 @@ export default function FeedbackFallo({
       {/* Frase en español */}
       <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[18px] flex flex-col gap-2">
         <span className="text-eyebrow font-semibold uppercase text-mute">
-          DILO EN VOZ ALTA
+          Tradúcelo en voz alta
         </span>
         <p className="text-[15px] font-semibold text-body leading-snug">
           {fraseEspanol}

@@ -330,7 +330,7 @@ export default function SesionInterna() {
         // key en el wrapper: cuando cambia la frase, React re-monta y dispara el slide-in
         <div key={fraseActualId} className="w-full flex flex-col items-center animate-slide-in">
           <div className={`w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-3 ${animandoPerfecto ? "animate-scale-perfecto" : ""}`}>
-            <span className="text-eyebrow font-semibold uppercase text-mute">DILO EN VOZ ALTA</span>
+            <span className="text-eyebrow font-semibold uppercase text-mute">Tradúcelo en voz alta</span>
             <p className="text-[18px] font-semibold text-body leading-snug">{fraseActual.es}</p>
           </div>
 

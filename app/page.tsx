@@ -182,14 +182,24 @@ export default function Inicio() {
 
       </div>
 
-      {/* Link a Mi trayectoria */}
-      <button
-        onClick={() => router.push("/mi-trayectoria")}
-        className="flex items-center gap-1.5 text-sm font-medium text-mute hover:text-ink transition-colors mt-2"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
-        Mi trayectoria
-      </button>
+      {/* Links de pie */}
+      <div className="flex flex-col items-center gap-2 mt-2">
+        <button
+          onClick={() => router.push("/mi-trayectoria")}
+          className="flex items-center gap-1.5 text-sm font-medium text-mute hover:text-ink transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+          Mi trayectoria
+        </button>
+        <a
+          href="https://forms.gle/aApWeQmSRG2iYagTA"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-medium text-brand-500 hover:text-brand-700 transition-colors"
+        >
+          ¡Dame feedback, por favor!
+        </a>
+      </div>
     </main>
   );
 }

@@ -27,7 +27,10 @@ export default function ComoFunciona() {
         <div className="flex flex-col gap-2">
           <span className="text-eyebrow font-semibold uppercase text-mute">Cómo se usa</span>
           <p className="text-[14px] font-medium text-body leading-relaxed">
-            FlashEnglish se puede hacer sola o con un adulto al lado. Si juegas sola, lees la frase, la dices en alto y te autoevalúas. Si juegas con un adulto, el adulto puede leer la frase, escucharte y pulsar la evaluación por ti.
+            FlashEnglish se puede hacer solo o con un adulto al lado. Si juegas solo, lees la frase, la dices en alto y te autoevalúas. Si juegas con un adulto, el adulto puede leer la frase, escucharte y pulsar la evaluación por ti.
+          </p>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            Decirlas en voz alta ayuda a automatizar estructuras y ganar velocidad mental en inglés.
           </p>
         </div>
 
