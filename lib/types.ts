@@ -49,6 +49,10 @@ export interface SesionEnCurso {
   ids_repaso: string[];   // IDs que ya estaban en repaso al construir la sesión
   indice_actual: number;
   respuestas: RespuestaSesion[];
+  // Fase 3: campos opcionales para sesiones de refuerzo temático.
+  // Ausencia de tipo = sesión normal de bloque (retrocompatible).
+  tipo?: "bloque" | "refuerzo";
+  temaId?: string;
 }
 
 // ── Perfil ────────────────────────────────────────────────────────────────

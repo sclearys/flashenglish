@@ -104,6 +104,22 @@ export interface ProgresoPorTema {
   porcentaje: number; // round(100 * aprendidas / total)
 }
 
+/**
+ * Frases del tema grande que pertenecen a un bloque desbloqueado del perfil.
+ * Sin filtros de fecha ni de estado de aprendizaje — para sesiones de refuerzo.
+ */
+export function frasesDelTemaEnNivel(perfil: Perfil, temaId: string): Frase[] {
+  const desbloqueados = new Set(perfil.bloques_desbloqueados);
+  const resultado: Frase[] = [];
+  for (const frase of todasLasFrases) {
+    if (!desbloqueados.has(frase.bloque)) continue;
+    if (_temasGrandesPorFrase.get(frase.id)?.includes(temaId)) {
+      resultado.push(frase);
+    }
+  }
+  return resultado;
+}
+
 export function calcularProgresoTemas(perfil: Perfil): ProgresoPorTema[] {
   // Índice de posición dentro del bloque para comparar con puntero_frase_nueva
   const posicionPorFrase = new Map<string, number>();

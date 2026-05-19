@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { cargarEstado, obtenerPerfilActivo } from "@/lib/storage";
-import { calcularProgresoTemas, ProgresoPorTema, BLOQUES_ORDENADOS } from "@/lib/catalogo";
+import {
+  calcularProgresoTemas,
+  frasesDelTemaEnNivel,
+  ProgresoPorTema,
+  BLOQUES_ORDENADOS,
+  totalPorTema,
+  nivelPorTema,
+} from "@/lib/catalogo";
 import { Perfil } from "@/lib/types";
 
 const NIVELES = ["basic", "intermediate", "advanced"] as const;
@@ -13,16 +21,40 @@ const ETIQUETA_NIVEL: Record<string, string> = {
   advanced: "Advanced",
 };
 
+interface TemaConRefuerzo extends ProgresoPorTema {
+  frasesDisponibles: number; // frases en bloques desbloqueados del perfil
+}
+
 export default function MiTrayectoria() {
   const router = useRouter();
   const [perfil, setPerfil] = useState<Perfil | null>(null);
-  const [temas, setTemas] = useState<ProgresoPorTema[]>([]);
+  const [temas, setTemas] = useState<TemaConRefuerzo[]>([]);
 
   useEffect(() => {
     const estado = cargarEstado();
     const p = obtenerPerfilActivo(estado);
     setPerfil(p);
-    setTemas(calcularProgresoTemas(p));
+
+    const progresoBase = calcularProgresoTemas(p);
+    const progresoMap = new Map(progresoBase.map((t) => [t.tema, t]));
+
+    // Construir lista de todos los temas con frases en bloques desbloqueados
+    const todosLosTemas: TemaConRefuerzo[] = [];
+    for (const [tema] of Array.from(totalPorTema.entries())) {
+      const disponibles = frasesDelTemaEnNivel(p, tema).length;
+      if (disponibles === 0) continue; // el tema no toca ningún bloque desbloqueado
+
+      const base = progresoMap.get(tema) ?? {
+        tema,
+        nivel: nivelPorTema.get(tema) ?? "basic",
+        total: totalPorTema.get(tema) ?? 0,
+        aprendidas: 0,
+        porcentaje: 0,
+      };
+      todosLosTemas.push({ ...base, frasesDisponibles: disponibles });
+    }
+
+    setTemas(todosLosTemas);
   }, []);
 
   if (!perfil) {
@@ -33,12 +65,10 @@ export default function MiTrayectoria() {
     );
   }
 
-  const temasConProgreso = temas.filter((t) => t.aprendidas > 0);
-
   const temasGrupo = (nivel: string) =>
-    temasConProgreso
+    temas
       .filter((t) => t.nivel === nivel)
-      .sort((a, b) => b.porcentaje - a.porcentaje);
+      .sort((a, b) => b.porcentaje - a.porcentaje || a.tema.localeCompare(b.tema));
 
   const frasesAprendidas = BLOQUES_ORDENADOS.reduce((sum, b) => {
     const puntero = perfil.puntero_frase_nueva[b.codigo] ?? 0;
@@ -48,6 +78,7 @@ export default function MiTrayectoria() {
     return sum + Math.max(0, puntero - enRepaso);
   }, 0);
 
+  const temasConProgreso = temas.filter((t) => t.aprendidas > 0);
   const tocados = temasConProgreso.length;
   const dominados = temasConProgreso.filter((t) => t.porcentaje >= 80).length;
 
@@ -64,7 +95,7 @@ export default function MiTrayectoria() {
             ← Volver
           </button>
           <h1 className="text-[18px] font-semibold text-ink">Mi trayectoria</h1>
-          <p className="text-[13px] text-body">Tu dominio de los temas</p>
+          <p className="text-[13px] text-body">Tu dominio de los temas · Pulsa un tema para practicarlo</p>
         </div>
 
         {/* Stats box */}
@@ -94,33 +125,74 @@ export default function MiTrayectoria() {
                 <p className="text-eyebrow text-mute">{filas.length} temas</p>
               </div>
               <div className="flex flex-col divide-y divide-brand-50">
-                {filas.map((t) => (
-                  <div key={t.tema} className="flex items-center gap-3 py-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-semibold text-ink truncate">{t.tema}</p>
-                      <p className="text-[11px] text-mute">{t.total} frases</p>
+                {filas.map((t) => {
+                  const href = `/refuerzo/${encodeURIComponent(t.tema)}`;
+                  const deshabilitado = t.frasesDisponibles === 0;
+
+                  const contenido = (
+                    <div className="flex items-center gap-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[14px] font-semibold truncate ${deshabilitado ? "text-mute" : "text-ink"}`}>
+                          {t.tema}
+                        </p>
+                        <p className="text-[11px] text-mute">{t.total} frases</p>
+                      </div>
+                      <div className="w-20 h-1.5 rounded-full bg-brand-100 shrink-0 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-[400ms] ease-out ${
+                            t.porcentaje >= 80 ? "bg-success" : "bg-brand-500"
+                          }`}
+                          style={{ width: `${t.porcentaje}%` }}
+                        />
+                      </div>
+                      <p className="text-[13px] font-semibold text-ink tabular-nums w-9 text-right shrink-0">
+                        {t.porcentaje}%
+                      </p>
+                      {/* Chevron: indica que es tappable */}
+                      {!deshabilitado && (
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-mute shrink-0"
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                      )}
                     </div>
-                    <div className="w-20 h-1.5 rounded-full bg-brand-100 shrink-0 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-[400ms] ease-out ${
-                          t.porcentaje >= 80 ? "bg-success" : "bg-brand-500"
-                        }`}
-                        style={{ width: `${t.porcentaje}%` }}
-                      />
-                    </div>
-                    <p className="text-[13px] font-semibold text-ink tabular-nums w-9 text-right shrink-0">
-                      {t.porcentaje}%
-                    </p>
-                  </div>
-                ))}
+                  );
+
+                  if (deshabilitado) {
+                    return (
+                      <div key={t.tema} className="opacity-40 cursor-not-allowed">
+                        {contenido}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={t.tema}
+                      href={href}
+                      className="hover:bg-brand-50 rounded-lg transition-colors -mx-2 px-2"
+                    >
+                      {contenido}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           );
         })}
 
-        {temasConProgreso.length === 0 && (
+        {temas.length === 0 && (
           <p className="text-sm text-mute text-center py-8">
-            Aún no has aprendido ninguna frase. ¡Empieza una sesión!
+            Aún no hay temas disponibles. ¡Empieza una sesión!
           </p>
         )}
 

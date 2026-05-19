@@ -10,7 +10,7 @@ import {
   avanzarBloqueActivo,
 } from "@/lib/storage";
 import { porcentajeBloque, BLOQUES_ORDENADOS, temasGrandesPorFrase } from "@/lib/catalogo";
-import { construirSesion, obtenerFrasePorId } from "@/lib/sesion";
+import { construirSesion, construirSesionRefuerzo, obtenerFrasePorId } from "@/lib/sesion";
 import { evaluarFrase, avanzarPunterosAlTerminar, actualizarRacha } from "@/lib/aprendizaje";
 import { temasARepasar } from "@/lib/stats";
 import { AppState, Frase, ResultadoEval, SesionEnCurso } from "@/lib/types";
@@ -69,33 +69,46 @@ export default function SesionInterna() {
     const tamanyoParam = parseInt(searchParams.get("frases") ?? "25", 10);
     const tamanyoSesion = [10, 15, 20, 25].includes(tamanyoParam) ? tamanyoParam : 25;
 
-    // Ignorar sesión guardada si es de otro bloque o está vacía
+    // Detectar si es una sesión de refuerzo
+    const tipoParam = searchParams.get("tipo");
+    const temaParam = searchParams.get("tema") ?? "";
+    const esRefuerzo = tipoParam === "refuerzo";
+
+    // Guard de sesión guardada: criterio distinto según el modo
     const sesionGuardadaValida =
       !forzarNueva &&
       perfil.sesion_en_curso &&
       perfil.sesion_en_curso.frases_ids.length > 0 &&
-      perfil.sesion_en_curso.frases_ids[0].startsWith(perfil.bloque_activo + "-");
+      (esRefuerzo
+        ? perfil.sesion_en_curso.tipo === "refuerzo" &&
+          perfil.sesion_en_curso.temaId === temaParam
+        : perfil.sesion_en_curso.frases_ids[0].startsWith(perfil.bloque_activo + "-"));
 
     const sesionActiva = sesionGuardadaValida
       ? perfil.sesion_en_curso!
+      : esRefuerzo
+      ? construirSesionRefuerzo(perfil, temaParam, tamanyoSesion)
       : construirSesion(perfil, tamanyoSesion);
 
-    // Punto A: sesión vacía — puede ser bloque al 100% o sin frases disponibles hoy
+    // Sesión vacía
     if (sesionActiva.frases_ids.length === 0) {
+      if (esRefuerzo) {
+        // Sin frases de refuerzo disponibles — volver a Mi trayectoria
+        router.push("/mi-trayectoria");
+        return;
+      }
+      // Punto A (bloque): sesión vacía — puede ser bloque al 100% o sin frases disponibles hoy
       const pct = porcentajeBloque(perfil, bloqueAlIniciar);
       const hayBloqueSiguiente =
         BLOQUES_ORDENADOS.findIndex((b) => b.codigo === bloqueAlIniciar) <
         BLOQUES_ORDENADOS.length - 1;
       if (pct >= 100 && hayBloqueSiguiente) {
-        // Bloque completado: limpiar sesión y avanzar
         const perfilSinSesion = { ...perfil, sesion_en_curso: null };
         const estadoSinSesion = actualizarPerfilActivo(estadoCargado, perfilSinSesion);
         avanzarBloqueActivo(estadoSinSesion);
         router.push(`/fin-de-bloque?bloque=${bloqueAlIniciar}`);
         return;
       }
-      // Sin frases disponibles (todo practicado hoy, o último bloque terminado)
-      // No guardar sesión vacía en localStorage
       router.push("/");
       return;
     }
@@ -110,9 +123,49 @@ export default function SesionInterna() {
   const terminarSesion = useCallback(
     (estadoFinal: AppState, sesionFinal: SesionEnCurso) => {
       const perfilActual = obtenerPerfilActivo(estadoFinal);
+      const esRefuerzo = sesionFinal.tipo === "refuerzo";
+
+      if (esRefuerzo) {
+        // ── Modo refuerzo: solo actualiza racha; no toca punteros ni progreso_frases ──
+        const racha = actualizarRacha(perfilActual);
+        const perfilTerminado = {
+          ...perfilActual,
+          racha_dias: racha.racha_dias,
+          ultima_sesion_fecha: racha.ultima_sesion_fecha,
+          sesion_en_curso: null,
+        };
+        const estadoTerminado = actualizarPerfilActivo(estadoFinal, perfilTerminado);
+        guardarEstado(estadoTerminado);
+
+        const temaId = sesionFinal.temaId ?? "";
+        const hayFallo = sesionFinal.respuestas.some((r) => r.resultado === "incorrecto");
+
+        const resumen = {
+          total: sesionFinal.frases_ids.length,
+          respuestas: sesionFinal.respuestas,
+          frases_aprendidas: 0,
+          en_repaso_manana: 0,
+          tipo: "refuerzo",
+          tema: temaId,
+          tamano: sesionFinal.frases_ids.length,
+          temas_repasar: temasARepasar(sesionFinal.respuestas, obtenerFrasePorId),
+        };
+
+        localStorage.setItem("flashenglish.resumen", JSON.stringify(resumen));
+
+        if (!hayFallo) {
+          router.push(
+            `/refuerzo-perfecto?tema=${encodeURIComponent(temaId)}&total=${sesionFinal.frases_ids.length}`
+          );
+        } else {
+          router.push("/resumen");
+        }
+        return;
+      }
+
+      // ── Modo bloque: lógica original ──────────────────────────────────────────
       const bloqueCompletado = perfilActual.bloque_activo;
 
-      // Snapshot del bloque ANTES de actualizar punteros
       const punteroAntes = perfilActual.puntero_frase_nueva[bloqueCompletado] ?? 0;
       const enRepasoAntes = Object.keys(perfilActual.progreso_frases).filter(
         (id) => id.startsWith(bloqueCompletado + "-")
@@ -142,7 +195,6 @@ export default function SesionInterna() {
       const frasesAprendidas = nuevasPerfectas + repasoCompletadas;
       const enRepasoManana = Object.keys(perfilFinal.progreso_frases).length;
 
-      // Snapshot del bloque DESPUÉS de actualizar punteros
       const punteroDespues = perfilFinal.puntero_frase_nueva[bloqueCompletado] ?? 0;
       const enRepasoDespues = Object.keys(perfilFinal.progreso_frases).filter(
         (id) => id.startsWith(bloqueCompletado + "-")
@@ -150,7 +202,6 @@ export default function SesionInterna() {
       const aprendidasDespues = Math.max(0, punteroDespues - enRepasoDespues);
       const porcentajeDespues = porcentajeBloque(perfilFinal, bloqueCompletado);
 
-      // Temas grandes únicos tocados en la sesión
       const temasEnSesion = new Set<string>();
       for (const fraseId of sesionFinal.frases_ids) {
         for (const tema of (temasGrandesPorFrase.get(fraseId) ?? [])) {
@@ -172,7 +223,6 @@ export default function SesionInterna() {
         temas_repasar: temasARepasar(sesionFinal.respuestas, obtenerFrasePorId),
       };
 
-      // Punto B: detectar si esta sesión completó el bloque activo
       const pct = porcentajeBloque(perfilFinal, bloqueCompletado);
       const hayBloqueSiguiente =
         BLOQUES_ORDENADOS.findIndex((b) => b.codigo === bloqueCompletado) <
@@ -193,7 +243,6 @@ export default function SesionInterna() {
 
   const avanzarTarjeta = useCallback(
     (estadoActual: AppState, sesionActual: SesionEnCurso) => {
-      // Cortar el audio de la tarjeta anterior antes de pasar a la siguiente
       detenerAudio();
       const siguienteIndice = sesionActual.indice_actual + 1;
 
@@ -217,12 +266,11 @@ export default function SesionInterna() {
 
   function retrocederTarjeta() {
     if (!estado || !sesion || !snapshotAnterior) return;
-    // Restaura el estado previo a la última evaluación
     guardarEstado(snapshotAnterior.estado);
     setEstado(snapshotAnterior.estado);
     setSesion(snapshotAnterior.sesion);
     setSnapshotAnterior(null);
-    setRevelada(true); // muestra la tarjeta anterior ya revelada
+    setRevelada(true);
     setPantalla("tarjeta");
     setAnimandoPerfecto(false);
   }
@@ -230,14 +278,24 @@ export default function SesionInterna() {
   function manejarEvaluacion(resultado: ResultadoEval) {
     if (!estado || !sesion) return;
 
-    // Guarda snapshot antes de evaluar (permite retroceder una vez)
     setSnapshotAnterior({ estado, sesion });
 
     const perfil = obtenerPerfilActivo(estado);
     const fraseId = sesion.frases_ids[sesion.indice_actual];
     const fraseActual = obtenerFrasePorId(fraseId);
+    const esRefuerzo = sesion.tipo === "refuerzo";
 
-    const perfilActualizado = evaluarFrase(perfil, fraseId, resultado, sesion);
+    let perfilActualizado: typeof perfil;
+    if (esRefuerzo) {
+      // Refuerzo: no tocar progreso_frases; solo sumar aciertos si fue perfecto
+      perfilActualizado =
+        resultado === "perfecto"
+          ? { ...perfil, aciertos_totales: perfil.aciertos_totales + 1 }
+          : perfil;
+    } else {
+      perfilActualizado = evaluarFrase(perfil, fraseId, resultado, sesion);
+    }
+
     const sesionConRespuesta: SesionEnCurso = {
       ...sesion,
       respuestas: [...sesion.respuestas, { id: fraseId, resultado }],
@@ -250,17 +308,13 @@ export default function SesionInterna() {
     setSesion(sesionConRespuesta);
 
     if (resultado === "perfecto") {
-      // Escala breve en la card antes de avanzar
       setAnimandoPerfecto(true);
       setTimeout(() => {
         setAnimandoPerfecto(false);
         avanzarTarjeta(estadoActualizado, sesionConRespuesta);
       }, 250);
     } else {
-      setDatosFeedback({
-        resultado,
-        frase: fraseActual!,
-      });
+      setDatosFeedback({ resultado, frase: fraseActual! });
       setPantalla("feedback");
     }
   }
@@ -279,6 +333,7 @@ export default function SesionInterna() {
   const fraseActualId = sesion.frases_ids[indice];
   const fraseActual: Frase | undefined = obtenerFrasePorId(fraseActualId);
   const porcentaje = totalFrases > 0 ? Math.round((indice / totalFrases) * 100) : 0;
+  const esRefuerzo = sesion.tipo === "refuerzo";
 
   if (!fraseActual) {
     return (
@@ -295,7 +350,7 @@ export default function SesionInterna() {
       <div className="w-full max-w-sm flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/")}
+            onClick={() => esRefuerzo ? router.push("/mi-trayectoria") : router.push("/")}
             className="text-sm font-semibold text-brand-500 hover:text-brand-700 transition-colors"
           >
             ← Salir
@@ -304,9 +359,17 @@ export default function SesionInterna() {
             🔥 {perfil.racha_dias} {perfil.racha_dias === 1 ? "día" : "días"}
           </span>
         </div>
-        <span className="font-sans font-medium text-sm text-ink tabular-nums">
-          {indice + 1} / {totalFrases}
-        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="font-sans font-medium text-sm text-ink tabular-nums">
+            {indice + 1} / {totalFrases}
+          </span>
+          {/* Chip de modo refuerzo con el nombre del tema */}
+          {esRefuerzo && sesion.temaId && (
+            <span className="text-[10px] font-semibold text-brand-500 bg-brand-50 rounded-full px-2 py-0.5 leading-none">
+              Refuerzo · {sesion.temaId}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Barra de progreso */}
@@ -327,7 +390,6 @@ export default function SesionInterna() {
           onContinuar={() => avanzarTarjeta(estado, sesion)}
         />
       ) : (
-        // key en el wrapper: cuando cambia la frase, React re-monta y dispara el slide-in
         <div key={fraseActualId} className="w-full flex flex-col items-center animate-slide-in">
           <div className={`w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-3 ${animandoPerfecto ? "animate-scale-perfecto" : ""}`}>
             <span className="text-eyebrow font-semibold uppercase text-mute">Tradúcelo en voz alta</span>
@@ -337,7 +399,6 @@ export default function SesionInterna() {
           {revelada && (
             <div className={`w-full max-w-sm bg-brand-100 rounded-lg px-[14px] py-[18px] border border-brand-500/20 flex flex-col gap-2 mb-6 ${animandoPerfecto ? "animate-scale-perfecto" : ""}`}>
               <span className="text-eyebrow font-semibold uppercase text-brand-700">ENGLISH</span>
-              {/* Frase en inglés + botón de repetir inline a la derecha */}
               <div className="flex items-center gap-2">
                 <p className="text-[18px] font-semibold text-ink leading-snug flex-1">
                   {fraseActual.en}
@@ -348,7 +409,6 @@ export default function SesionInterna() {
                     className="shrink-0 text-mute hover:text-ink transition-colors"
                     aria-label="Escuchar pronunciación"
                   >
-                    {/* Altavoz con ondas de sonido */}
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                       <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
@@ -357,7 +417,6 @@ export default function SesionInterna() {
                   </button>
                 )}
               </div>
-              {/* Fallback: solo se muestra si el navegador no soporta Web Speech */}
               {!speechDisponible && (
                 <p className="text-[13px] font-normal text-mute">
                   Tu navegador no reproduce audio
@@ -375,7 +434,6 @@ export default function SesionInterna() {
             </button>
           ) : (
             <div className={`w-full max-w-sm grid gap-[7px] ${snapshotAnterior ? "grid-cols-4" : "grid-cols-3"}`}>
-              {/* Botón retroceder: solo visible si hay una evaluación anterior que deshacer */}
               {snapshotAnterior && (
                 <button
                   onClick={retrocederTarjeta}

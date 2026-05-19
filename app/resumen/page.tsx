@@ -15,7 +15,7 @@ interface ResumenData {
   respuestas: RespuestaSesion[];
   frases_aprendidas: number;
   en_repaso_manana: number;
-  // campos añadidos en It-5 (opcionales para compatibilidad)
+  // campos de sesión normal de bloque (opcionales para compatibilidad)
   bloque?: string;
   aprendidas_antes?: number;
   aprendidas_despues?: number;
@@ -23,6 +23,10 @@ interface ResumenData {
   porcentaje_despues?: number;
   temas_sesion?: string[];
   temas_repasar?: TemaRepasar[];
+  // campos de refuerzo
+  tipo?: "refuerzo";
+  tema?: string;
+  tamano?: number;
 }
 
 function emojiPorcentaje(pct: number): string {
@@ -46,7 +50,6 @@ export default function Resumen() {
     if (raw) {
       setDatos(JSON.parse(raw));
       localStorage.removeItem("flashenglish.resumen");
-      // Doble rAF: espera a que React pinte el estado inicial antes de animar
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimado(true)));
     } else {
       router.replace("/");
@@ -61,6 +64,7 @@ export default function Resumen() {
     );
   }
 
+  const esRefuerzo = datos.tipo === "refuerzo";
   const { total, respuestas } = datos;
   const perfectas = respuestas.filter((r) => r.resultado === "perfecto").length;
   const casi = respuestas.filter((r) => r.resultado === "casi").length;
@@ -84,8 +88,19 @@ export default function Resumen() {
         {/* Cabecera */}
         <div className="flex flex-col gap-1">
           <span className="text-5xl leading-tight">{emojiPorcentaje(porcentaje)}</span>
-          <h1 className="text-[22px] font-semibold text-ink mt-1">Sesión completada</h1>
-          <p className="text-[13px] text-mute">{total} frases</p>
+          {esRefuerzo ? (
+            <>
+              <h1 className="text-[22px] font-semibold text-ink mt-1">
+                Refuerzo de {datos.tema}
+              </h1>
+              <p className="text-[13px] text-mute">{total} frases</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-[22px] font-semibold text-ink mt-1">Sesión completada</h1>
+              <p className="text-[13px] text-mute">{total} frases</p>
+            </>
+          )}
         </div>
 
         {/* 3 chips de resultado */}
@@ -110,8 +125,9 @@ export default function Resumen() {
           </div>
         </div>
 
-        {/* Card de progreso del bloque */}
-        {bloqueInfo &&
+        {/* Card de progreso del bloque — solo en sesión normal */}
+        {!esRefuerzo &&
+          bloqueInfo &&
           datos.aprendidas_antes !== undefined &&
           datos.aprendidas_despues !== undefined &&
           datos.porcentaje_antes !== undefined &&
@@ -168,8 +184,8 @@ export default function Resumen() {
           </div>
         )}
 
-        {/* Temas de esta sesión */}
-        {datos.temas_sesion && datos.temas_sesion.length > 0 && (
+        {/* Temas de esta sesión — solo en sesión normal */}
+        {!esRefuerzo && datos.temas_sesion && datos.temas_sesion.length > 0 && (
           <div className="flex flex-col gap-2">
             <p className="text-eyebrow font-semibold uppercase text-mute">
               TEMAS DE ESTA SESIÓN
@@ -189,18 +205,41 @@ export default function Resumen() {
 
         {/* Botones */}
         <div className="flex flex-col gap-2 pt-1">
-          <button
-            onClick={() => router.push("/sesion?frases=25&nueva=1")}
-            className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
-          >
-            Otra sesión
-          </button>
-          <button
-            onClick={() => router.push("/")}
-            className="w-full h-12 rounded-md bg-white border border-brand-100 text-ink text-sm font-semibold hover:border-brand-300 transition-all"
-          >
-            Terminar
-          </button>
+          {esRefuerzo ? (
+            <>
+              <button
+                onClick={() =>
+                  router.push(
+                    `/sesion?tipo=refuerzo&tema=${encodeURIComponent(datos.tema ?? "")}&frases=${datos.tamano ?? 15}&nueva=1`
+                  )
+                }
+                className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
+              >
+                Otra sesión
+              </button>
+              <button
+                onClick={() => router.push("/mi-trayectoria")}
+                className="w-full h-12 rounded-md bg-white border border-brand-100 text-ink text-sm font-semibold hover:border-brand-300 transition-all"
+              >
+                Volver a Mi trayectoria
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => router.push("/sesion?frases=25&nueva=1")}
+                className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
+              >
+                Otra sesión
+              </button>
+              <button
+                onClick={() => router.push("/")}
+                className="w-full h-12 rounded-md bg-white border border-brand-100 text-ink text-sm font-semibold hover:border-brand-300 transition-all"
+              >
+                Terminar
+              </button>
+            </>
+          )}
         </div>
 
       </div>

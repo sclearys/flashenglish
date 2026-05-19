@@ -1,5 +1,5 @@
 import { Perfil, SesionEnCurso } from "./types";
-import { frasesDelBloque } from "./catalogo";
+import { frasesDelBloque, frasesDelTemaEnNivel } from "./catalogo";
 
 const TAMANYO_SESION_DEFAULT = 25;
 
@@ -49,6 +49,37 @@ export function contarRepasoMañana(perfil: Perfil): number {
   return Object.values(perfil.progreso_frases)
     .filter((p) => p.pendientes > 0 && p.ultima_vez.slice(0, 10) === fechaHoy)
     .length;
+}
+
+/**
+ * Construye una sesión de refuerzo temático.
+ * Toma frases del tema en bloques desbloqueados, en orden aleatorio.
+ * No aplica filtro de fecha (Pieza D). No escribe en progreso_frases.
+ */
+export function construirSesionRefuerzo(
+  perfil: Perfil,
+  temaId: string,
+  tamano: number
+): SesionEnCurso {
+  const frases = frasesDelTemaEnNivel(perfil, temaId);
+
+  // Barajar (Fisher-Yates)
+  const barajadas = [...frases];
+  for (let i = barajadas.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [barajadas[i], barajadas[j]] = [barajadas[j], barajadas[i]];
+  }
+
+  const seleccionadas = barajadas.slice(0, tamano).map((f) => f.id);
+
+  return {
+    frases_ids: seleccionadas,
+    ids_repaso: [],   // en refuerzo no hay frases en repaso
+    indice_actual: 0,
+    respuestas: [],
+    tipo: "refuerzo",
+    temaId,
+  };
 }
 
 /**
