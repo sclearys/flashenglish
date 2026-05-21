@@ -117,21 +117,13 @@ export default function Inicio() {
 
         {/* CTA principal */}
         {haySessionEnCurso ? (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => empezar(false)}
-              className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all flex items-center justify-center gap-2"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>
-              Continuar sesión ({perfil.sesion_en_curso!.indice_actual}/{perfil.sesion_en_curso!.frases_ids.length})
-            </button>
-            <button
-              onClick={() => empezar(true)}
-              className="w-full h-12 rounded-md bg-white border border-brand-100 text-brand-700 text-sm font-semibold hover:border-brand-300 transition-all"
-            >
-              Empezar sesión nueva
-            </button>
-          </div>
+          <button
+            onClick={() => empezar(false)}
+            className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all flex items-center justify-center gap-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>
+            Continuar sesión ({perfil.sesion_en_curso!.indice_actual}/{perfil.sesion_en_curso!.frases_ids.length})
+          </button>
         ) : frasesDisponibles ? (
           <button
             onClick={() => empezar()}
@@ -156,23 +148,25 @@ export default function Inicio() {
           </div>
         )}
 
-        {/* Links de ayuda — agrupados, siempre visibles */}
-        <div className="flex flex-col items-center gap-1">
-          {frasesDisponibles && !haySessionEnCurso && (
-            <button
-              onClick={() => router.push("/test-nivel")}
-              className="text-sm font-medium text-mute hover:text-ink transition-colors text-center py-1"
-            >
-              ¿Ya sabes inglés? → Haz el test de nivel
-            </button>
-          )}
+        {/* "Empezar sesión nueva" como link de texto — solo cuando hay sesión guardada */}
+        {haySessionEnCurso && (
           <button
-            onClick={() => router.push("/como-funciona")}
+            onClick={() => empezar(true)}
+            className="text-[13px] font-medium text-body underline decoration-[#D3D1C7] text-center w-full"
+          >
+            Empezar sesión nueva
+          </button>
+        )}
+
+        {/* Link test de nivel — solo cuando aplica */}
+        {frasesDisponibles && !haySessionEnCurso && (
+          <button
+            onClick={() => router.push("/test-nivel")}
             className="text-sm font-medium text-mute hover:text-ink transition-colors text-center py-1"
           >
-            Cómo funciona
+            ¿Ya sabes inglés? → Haz el test de nivel
           </button>
-        </div>
+        )}
 
         {/* Tu camino: barra de 8 segmentos */}
         <div className="flex flex-col gap-2">
@@ -180,16 +174,26 @@ export default function Inicio() {
           <BarraOchoSegmentos segmentos={segmentos} mostrarLabels />
         </div>
 
-      </div>
-
-      {/* Links de pie */}
-      <div className="flex flex-col items-center gap-2 mt-2">
+        {/* Acceso a Tu dominio y refuerzo temático */}
         <button
           onClick={() => router.push("/mi-trayectoria")}
-          className="flex items-center gap-1.5 text-sm font-medium text-mute hover:text-ink transition-colors"
+          className="self-center flex items-center gap-1.5 hover:opacity-75 transition-opacity"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
-          Mi trayectoria
+          <span className="text-sm font-semibold text-ink">Tu dominio</span>
+          <span className="text-sm font-medium" style={{ color: "#D3D1C7" }}> · </span>
+          <span className="text-sm font-medium text-body">Refuerza temas</span>
+        </button>
+
+      </div>
+
+      {/* Footer */}
+      <div className="flex flex-col items-center gap-2 mt-2">
+        <button
+          onClick={() => router.push("/como-funciona")}
+          className="text-sm font-medium text-mute hover:text-ink transition-colors"
+        >
+          Cómo funciona
         </button>
         <a
           href="https://forms.gle/aApWeQmSRG2iYagTA"

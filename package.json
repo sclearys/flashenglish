@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "audit": "node scripts/auditoria-contenido.js"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.44.0",

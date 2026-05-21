@@ -79,8 +79,8 @@ export default function MiTrayectoria() {
           >
             ← Volver
           </button>
-          <h1 className="text-[18px] font-semibold text-ink">Mi trayectoria</h1>
-          <p className="text-[13px] text-body">Tu dominio de los temas · Pulsa un tema para practicarlo</p>
+          <h1 className="text-[18px] font-semibold text-ink">Tu dominio</h1>
+          <p className="text-[13px] text-body">Toca un tema para reforzarlo</p>
         </div>
 
         {/* Stats box */}
