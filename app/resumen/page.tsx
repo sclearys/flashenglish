@@ -109,7 +109,7 @@ export default function Resumen() {
             <span className="text-[22px] font-semibold text-success tabular-nums leading-none">
               {perfectas}
             </span>
-            <span className="text-[11px] text-success font-medium">Perfecto</span>
+            <span className="text-[11px] text-success font-medium">Fluido</span>
           </div>
           <div className="flex flex-col items-center gap-1 rounded-xl py-3" style={{ backgroundColor: "#FFC85726" }}>
             <span className="text-[22px] font-semibold tabular-nums leading-none" style={{ color: "#5C3F00" }}>

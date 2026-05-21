@@ -1,7 +1,7 @@
 import { Perfil, SesionEnCurso } from "./types";
 import { frasesDelBloque, frasesDelTemaEnNivel } from "./catalogo";
 
-const TAMANYO_SESION_DEFAULT = 25;
+const TAMANYO_SESION_DEFAULT = 15;
 
 // Re-exportar para mantener compatibilidad con imports existentes en SesionInterna y resumen
 export { obtenerFrasePorId } from "./catalogo";

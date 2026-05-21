@@ -16,6 +16,7 @@ import { temasARepasar } from "@/lib/stats";
 import { AppState, Frase, ResultadoEval, SesionEnCurso } from "@/lib/types";
 import FeedbackFallo from "@/components/FeedbackFallo";
 import { leerFraseEnIngles, detenerAudio, tieneWebSpeech } from "@/lib/audio";
+import { track } from "@vercel/analytics";
 
 type Pantalla = "tarjeta" | "feedback";
 
@@ -66,8 +67,8 @@ export default function SesionInterna() {
     const perfil = obtenerPerfilActivo(estadoCargado);
     const bloqueAlIniciar = perfil.bloque_activo;
     const forzarNueva = searchParams.get("nueva") === "1";
-    const tamanyoParam = parseInt(searchParams.get("frases") ?? "25", 10);
-    const tamanyoSesion = [10, 15, 20, 25].includes(tamanyoParam) ? tamanyoParam : 25;
+    const tamanyoParam = parseInt(searchParams.get("frases") ?? "15", 10);
+    const tamanyoSesion = [10, 15, 20, 25].includes(tamanyoParam) ? tamanyoParam : 15;
 
     // Detectar si es una sesión de refuerzo
     const tipoParam = searchParams.get("tipo");
@@ -118,6 +119,7 @@ export default function SesionInterna() {
     guardarEstado(estadoActualizado);
     setEstado(estadoActualizado);
     setSesion(sesionActiva);
+    track("sesion_iniciada", { perfil: perfil.nombre, bloque: perfil.bloque_activo });
   }, [searchParams, router]);
 
   const terminarSesion = useCallback(
@@ -458,7 +460,7 @@ export default function SesionInterna() {
                 onClick={() => manejarEvaluacion("perfecto")}
                 className="h-12 rounded-md bg-success text-white text-sm font-semibold hover:brightness-95 transition-all"
               >
-                Perfecto
+                Fluido
               </button>
             </div>
           )}

@@ -48,11 +48,11 @@ export default function ComoFunciona() {
 
           <div className="flex flex-col gap-5">
 
-            {/* Perfecto */}
+            {/* Fluido */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full shrink-0 bg-success" />
-                <span className="text-[14px] font-semibold text-ink">Perfecto</span>
+                <span className="text-[14px] font-semibold text-ink">Fluido</span>
               </div>
               <p className="text-[14px] font-medium text-body leading-relaxed pl-5">
                 La dijiste rápido, sin dudar, y básicamente igual que la respuesta modelo.

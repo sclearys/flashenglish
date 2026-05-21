@@ -56,7 +56,7 @@ export default function Inicio() {
 
   function empezar(nueva = false) {
     const params = new URLSearchParams();
-    params.set("frases", "25");
+    params.set("frases", "15");
     if (nueva) params.set("nueva", "1");
     router.push(`/sesion?${params.toString()}`);
   }
