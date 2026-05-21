@@ -9,8 +9,6 @@ import {
   frasesDelTemaEnNivel,
   ProgresoPorTema,
   BLOQUES_ORDENADOS,
-  totalPorTema,
-  nivelPorTema,
 } from "@/lib/catalogo";
 import { Perfil } from "@/lib/types";
 
@@ -35,24 +33,11 @@ export default function MiTrayectoria() {
     const p = obtenerPerfilActivo(estado);
     setPerfil(p);
 
-    const progresoBase = calcularProgresoTemas(p);
-    const progresoMap = new Map(progresoBase.map((t) => [t.tema, t]));
-
-    // Construir lista de todos los temas con frases en bloques desbloqueados
-    const todosLosTemas: TemaConRefuerzo[] = [];
-    for (const [tema] of Array.from(totalPorTema.entries())) {
-      const disponibles = frasesDelTemaEnNivel(p, tema).length;
-      if (disponibles === 0) continue; // el tema no toca ningún bloque desbloqueado
-
-      const base = progresoMap.get(tema) ?? {
-        tema,
-        nivel: nivelPorTema.get(tema) ?? "basic",
-        total: totalPorTema.get(tema) ?? 0,
-        aprendidas: 0,
-        porcentaje: 0,
-      };
-      todosLosTemas.push({ ...base, frasesDisponibles: disponibles });
-    }
+    // calcularProgresoTemas devuelve todos los temas del catálogo con su progreso.
+    // Añadimos frasesDisponibles y descartamos los que no tienen frases en bloques desbloqueados.
+    const todosLosTemas: TemaConRefuerzo[] = calcularProgresoTemas(p)
+      .map((t) => ({ ...t, frasesDisponibles: frasesDelTemaEnNivel(p, t.tema).length }))
+      .filter((t) => t.frasesDisponibles > 0);
 
     setTemas(todosLosTemas);
   }, []);
