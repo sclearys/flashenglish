@@ -22,9 +22,18 @@ export async function middleware(request: NextRequest) {
   // Construimos la respuesta base que irá acumulando cookies
   let supabaseResponse = NextResponse.next({ request });
 
+  // Si las variables de entorno de Supabase no están configuradas
+  // (p.ej. durante un deploy sin credenciales), dejamos pasar sin guard.
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {

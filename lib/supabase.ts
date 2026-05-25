@@ -14,16 +14,16 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Faltan variables de entorno de Supabase. " +
-      "Copia .env.local.example a .env.local y rellena tus valores."
-  );
-}
-
 export function crearClienteSupabase() {
-  return createBrowserClient(supabaseUrl!, supabaseAnonKey!);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Faltan variables de entorno de Supabase. " +
+        "Copia .env.local.example a .env.local y rellena tus valores."
+    );
+  }
+
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
