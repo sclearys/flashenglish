@@ -23,18 +23,29 @@ export default function ComoFunciona() {
           <h1 className="text-[18px] font-semibold text-ink">Cómo funciona</h1>
         </div>
 
-        {/* Bloque 1 — Cómo se usa */}
+        {/* Bloque 1 — Para quien acompaña */}
         <div className="flex flex-col gap-2">
-          <span className="text-eyebrow font-semibold uppercase text-mute">Cómo se usa</span>
+          <span className="text-eyebrow font-semibold uppercase text-mute">Para quien acompaña</span>
           <p className="text-[14px] font-medium text-body leading-relaxed">
-            FlashEnglish se puede hacer solo o con un adulto al lado. Si juegas solo, lees la frase, la dices en alto y te autoevalúas. Si juegas con un adulto, el adulto puede leer la frase, escucharte y pulsar la evaluación por ti.
+            FlashEnglish está pensada para usarse con un adulto al lado, sobre todo al principio. Una niña o niño puede usarla solo después, pero la herramienta funciona mejor cuando alguien escucha, da pie y ayuda a ser honesto en la autoevaluación.
           </p>
           <p className="text-[14px] font-medium text-body leading-relaxed">
-            Decirlas en voz alta ayuda a automatizar estructuras y ganar velocidad mental en inglés.
+            Tú decides cuánto acompañar: a veces sentarte a hacer una sesión juntos, otras veces dejar que vaya solo y repasar de vez en cuando.
           </p>
         </div>
 
-        {/* Bloque 2 — La mecánica */}
+        {/* Bloque 2 — Cómo se usa */}
+        <div className="flex flex-col gap-2">
+          <span className="text-eyebrow font-semibold uppercase text-mute">Cómo se usa</span>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            Si juegas solo, lees la frase, la dices en alto y te autoevalúas. Si juegas con un adulto, el adulto puede leer la frase, escucharte y pulsar la evaluación por ti.
+          </p>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            Decirlas en voz alta ayuda a automatizar estructuras y ganar velocidad mental en inglés. No vale pensar la respuesta y darla por buena: el objetivo es reproducirla en voz alta, no reconocerla con la cabeza.
+          </p>
+        </div>
+
+        {/* Bloque 3 — La mecánica */}
         <div className="flex flex-col gap-2">
           <span className="text-eyebrow font-semibold uppercase text-mute">La mecánica</span>
           <p className="text-[14px] font-medium text-body leading-relaxed">
@@ -42,7 +53,7 @@ export default function ComoFunciona() {
           </p>
         </div>
 
-        {/* Bloque 3 — Cómo te autoevalúas */}
+        {/* Bloque 4 — Cómo te autoevalúas */}
         <div className="flex flex-col gap-3">
           <span className="text-eyebrow font-semibold uppercase text-mute">Cómo te autoevalúas</span>
 
@@ -77,11 +88,33 @@ export default function ComoFunciona() {
                 <span className="text-[14px] font-semibold text-ink">Fallo</span>
               </div>
               <p className="text-[14px] font-medium text-body leading-relaxed pl-5">
-                No supiste cómo arrancar, te quedaste atascada, o la estructura general no era la correcta. La repetiremos en próximos días hasta que se asiente.
+                No supiste cómo arrancar, te quedaste atascado, o la estructura general no era la correcta. La repetiremos en próximos días hasta que se asiente.
               </p>
             </div>
 
           </div>
+        </div>
+
+        {/* Bloque 5 — Por qué la honestidad importa */}
+        <div className="flex flex-col gap-2">
+          <span className="text-eyebrow font-semibold uppercase text-mute">Por qué la honestidad importa</span>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            La app no oye lo que dices: confía en tu evaluación. El que se autoevalúa con honestidad es el que de verdad aprende, porque la app le devuelve justo las frases que necesita repetir.
+          </p>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            Si acompañas a un peque, ayúdale a ver que pulsar «Fallo» no es perder: es decirle a la app qué practicar.
+          </p>
+        </div>
+
+        {/* Bloque 6 — Por qué repetimos las frases */}
+        <div className="flex flex-col gap-2">
+          <span className="text-eyebrow font-semibold uppercase text-mute">Por qué repetimos las frases</span>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            Aprender a hablar un idioma no es memorizar respuestas, es automatizar estructuras hasta que salen solas. Eso pide repetición espaciada: ver la misma estructura varias veces, repartida en distintos días.
+          </p>
+          <p className="text-[14px] font-medium text-body leading-relaxed">
+            Por eso algunas frases vuelven a aparecer, aunque ya las hayas dado bien una vez. No es un error ni que vayas mal: es exactamente así como se asienta lo aprendido.
+          </p>
         </div>
 
       </div>
