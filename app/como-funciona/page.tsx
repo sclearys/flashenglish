@@ -117,6 +117,20 @@ export default function ComoFunciona() {
           </p>
         </div>
 
+        {/* Petición de feedback */}
+        <p className="text-[13px] font-medium text-mute text-center pb-2">
+          Por favor ayúdame a mejorar usando el{" "}
+          <a
+            href="https://forms.gle/aApWeQmSRG2iYagTA"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-500 hover:text-brand-700 transition-colors underline"
+          >
+            cuestionario de feedback
+          </a>
+          {" "}de la home.
+        </p>
+
       </div>
     </main>
   );
