@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { cargarEstado, obtenerPerfilActivo } from "@/lib/storage";
+import { cargarEstado, guardarEstadoLocal, obtenerPerfilActivo } from "@/lib/storage";
+import { descargarEstado } from "@/lib/nube";
 import { calcularStats } from "@/lib/stats";
 import { BLOQUES_ORDENADOS, porcentajeBloque } from "@/lib/catalogo";
 import { hayFrasesDisponibles, contarRepasoMañana } from "@/lib/sesion";
@@ -18,7 +19,17 @@ export default function Inicio() {
       router.push("/perfiles");
       return;
     }
+
+    // 1. Carga inmediata desde localStorage (síncrono, sin esperar red)
     setEstado(cargarEstado());
+
+    // 2. Sincronizar desde Supabase en segundo plano
+    descargarEstado().then((estadoNube) => {
+      if (estadoNube) {
+        guardarEstadoLocal(estadoNube); // actualiza localStorage sin re-upload
+        setEstado(estadoNube);          // re-renderiza con los datos de la nube
+      }
+    });
   }, [router]);
 
   if (!estado) {

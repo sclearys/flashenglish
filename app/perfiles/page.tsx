@@ -12,6 +12,9 @@ import {
   COLORES_PERFIL,
 } from "@/lib/storage";
 import { AppState } from "@/lib/types";
+import { crearClienteSupabase } from "@/lib/supabase";
+import { descargarEstado } from "@/lib/nube";
+import { guardarEstadoLocal } from "@/lib/storage";
 
 type Modo = "selector" | "crear" | "editar";
 
@@ -24,6 +27,7 @@ export default function Perfiles() {
   const [mostrarMigracion, setMostrarMigracion] = useState(false);
   const [nombreInput, setNombreInput] = useState("");
   const [colorSeleccionado, setColorSeleccionado] = useState<string>(COLORES_PERFIL[0]);
+  const [emailCuenta, setEmailCuenta] = useState<string | null>(null);
 
   useEffect(() => {
     const estadoCargado = cargarEstado();
@@ -40,6 +44,23 @@ export default function Perfiles() {
         setMostrarMigracion(true);
       }
     }
+
+    // Obtener el email de la cuenta autenticada para mostrarlo en el selector
+    async function cargarEmail() {
+      const supabase = crearClienteSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) setEmailCuenta(user.email);
+    }
+    cargarEmail();
+
+    // Sincronizar desde Supabase en segundo plano.
+    // Si la nube tiene datos, los usamos como fuente de verdad.
+    descargarEstado().then((estadoNube) => {
+      if (estadoNube) {
+        guardarEstadoLocal(estadoNube);
+        setEstado(estadoNube);
+      }
+    });
   }, []);
 
   if (!estado) {
@@ -55,6 +76,13 @@ export default function Perfiles() {
   const coloresUsados = perfilesArray.map(([, p]) => p.color_acento);
 
   // ── Acciones ───────────────────────────────────────────────────────────────
+
+  async function cerrarSesion() {
+    const supabase = crearClienteSupabase();
+    await supabase.auth.signOut();
+    sessionStorage.removeItem("perfilSeleccionado");
+    router.push("/entrar");
+  }
 
   function seleccionarPerfil(perfilId: string) {
     const nuevoEstado = cambiarPerfilActivo(estado!, perfilId);
@@ -244,6 +272,20 @@ export default function Perfiles() {
       )}
 
       <div className="w-full max-w-sm flex flex-col items-center gap-10">
+
+        {/* Cuenta activa y cierre de sesión */}
+        {emailCuenta && (
+          <div className="w-full flex items-center justify-between">
+            <span className="text-xs text-mute truncate max-w-[200px]">{emailCuenta}</span>
+            <button
+              onClick={cerrarSesion}
+              className="text-xs font-medium text-body hover:text-ink transition-colors"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        )}
+
         <h1 className="text-[22px] font-semibold text-ink">¿Quién eres?</h1>
 
         <div className="flex flex-wrap gap-8 justify-center">

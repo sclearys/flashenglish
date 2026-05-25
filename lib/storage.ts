@@ -1,6 +1,7 @@
 import { AppState, Frase, Perfil } from "./types";
 import catalogo from "../data/content.json";
 import { BLOQUES_ORDENADOS } from "./catalogo";
+import { subirEstado } from "./nube";
 
 const STORAGE_KEY = "flashenglish.state";
 const VERSION = 2;
@@ -51,6 +52,17 @@ export function cargarEstado(): AppState {
 }
 
 export function guardarEstado(estado: AppState): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
+  subirEstado(estado); // fire-and-forget: sube a Supabase en segundo plano
+}
+
+/**
+ * Guarda el estado SOLO en localStorage, sin disparar el upload a Supabase.
+ * Usar únicamente cuando se acaba de descargar desde Supabase, para evitar
+ * un ciclo innecesario de descarga → upload.
+ */
+export function guardarEstadoLocal(estado: AppState): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
 }

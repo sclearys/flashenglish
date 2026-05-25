@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -9,11 +9,15 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+// themeColor va en viewport (no en metadata) desde Next.js 14.1
+export const viewport: Viewport = {
+  themeColor: "#FF7A45",
+};
+
 export const metadata: Metadata = {
   title: "FlashEnglish",
   description: "Practica traducción español → inglés con tarjetas",
   manifest: "/manifest.json",
-  themeColor: "#FF7A45",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
