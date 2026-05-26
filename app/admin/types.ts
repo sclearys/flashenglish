@@ -1,0 +1,80 @@
+/**
+ * Tipos compartidos entre el Server Component (page.tsx) y el Client
+ * Component (AdminPanel.tsx) del backoffice.
+ *
+ * Son versiones "aplanadas" del AppState, con solo los campos que
+ * necesita la UI de admin. Mantenerlos simples facilita la serialización
+ * server → client (solo strings, numbers y booleans).
+ */
+
+export type PerfilResumen = {
+  id: string;           // "perfil_1" | "perfil_2" | "perfil_3"
+  nombre: string;
+  color: string;        // hex, p.ej. "#FF7A45"
+  bloqueActivo: string; // "BASIC1" | "INT2" | etc.
+  progresoBloque: number; // 0-100, calculado del puntero vs total frases
+  racha: number;          // racha_dias del perfil
+  sesionEnCurso: boolean;
+  sesionInicio: string | null; // ISO timestamp si existe campo inicio (Pieza F+)
+};
+
+export type UsuarioResumen = {
+  id: string;                       // UUID de auth.users
+  email: string;
+  nombreDisplay: string;            // full_name de Google o prefijo del email
+  creadoEn: string;                 // ISO timestamp de registro
+  ultimaActualizacion: string | null; // actualizado_en de estado_usuario
+  diasDesdeUltima: number;          // días desde ultimaActualizacion (999 si nunca)
+  perfilActivoId: string;           // "perfil_1" | etc.
+  perfiles: PerfilResumen[];        // todos los perfiles del AppState
+  tieneEstado: boolean;             // false si aún no tiene fila en estado_usuario
+};
+
+// ── Tipos del panel de detalle (It-3) ────────────────────────────────────────
+
+export type BloqueDetalle = {
+  cod: string;
+  pct: number;                      // 0-100, frases aprendidas / total del bloque
+  estado: "done" | "active" | "locked";
+};
+
+export type TemaDetalle = {
+  nombre: string;
+  pct: number;                      // % de frases del tema que el perfil ha aprendido
+};
+
+export type SesionDetalle = {
+  tipo: string;                     // "bloque" | "refuerzo"
+  temaId: string | null;            // solo en refuerzo
+  frasesPendientes: number;         // frases que quedan en la sesión guardada
+  inicio: string | null;            // ISO timestamp (Pieza F+); null en sesiones antiguas
+};
+
+export type PerfilDetalle = {
+  id: string;
+  nombre: string;
+  color: string;
+  bloqueActivo: string;
+  frasesAprendidas: number;         // frases que han completado el ciclo de repaso
+  totalFrases: number;              // siempre 750 (catálogo completo)
+  progresoTotal: number;            // 0-100 sobre las 750 frases
+  racha: number;
+  bloquesDesbloqueados: string[];
+  bloques: BloqueDetalle[];         // los 8 bloques en orden
+  temas: TemaDetalle[];             // top 6 por % aprendido
+  sesion: SesionDetalle | null;
+  // Para la acción "borrar última vez" (It-4)
+  ultimaVezFecha: string | null;    // "YYYY-MM-DD" de la sesión más reciente
+  ultimaVezEntradas: number;        // entradas de progreso_frases con esa fecha
+  // Para las acciones de bloque (It-5)
+  punteroBloque: number;            // puntero_frase_nueva del bloque activo
+  enRepasoBloque: number;           // entradas de progreso_frases del bloque activo
+};
+
+export type DetalleUsuario = {
+  id: string;
+  email: string;
+  nombreDisplay: string;
+  perfiles: PerfilDetalle[];
+  perfilActivoId: string;
+};

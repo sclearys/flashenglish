@@ -53,6 +53,10 @@ export interface SesionEnCurso {
   // Ausencia de tipo = sesión normal de bloque (retrocompatible).
   tipo?: "bloque" | "refuerzo";
   temaId?: string;
+  // Pieza F: timestamp de inicio de sesión. Opcional para retrocompatibilidad
+  // con sesiones guardadas antes de este campo. Usado en el backoffice para
+  // detectar sesiones posiblemente atascadas (> 2h desde inicio).
+  inicio?: string;   // ISO timestamp, p.ej. "2026-05-26T09:14:00.000Z"
 }
 
 // ── Perfil ────────────────────────────────────────────────────────────────
