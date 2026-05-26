@@ -28,10 +28,14 @@ export default function Perfiles() {
   const [nombreInput, setNombreInput] = useState("");
   const [colorSeleccionado, setColorSeleccionado] = useState<string>(COLORES_PERFIL[0]);
   const [emailCuenta, setEmailCuenta] = useState<string | null>(null);
+  const [esModoInvitado, setEsModoInvitado] = useState(false);
 
   useEffect(() => {
     const estadoCargado = cargarEstado();
     setEstado(estadoCargado);
+
+    // Detectar si el usuario entró sin cuenta (cookie modo_invitado)
+    setEsModoInvitado(document.cookie.includes("modo_invitado=1"));
 
     // Mostrar modal de migración si hay 1 perfil llamado "Yo" con progreso guardado
     const perfiles = Object.values(estadoCargado.perfiles);
@@ -80,6 +84,15 @@ export default function Perfiles() {
   async function cerrarSesion() {
     const supabase = crearClienteSupabase();
     await supabase.auth.signOut();
+    // Limpiar cookie de modo invitado por si acaso
+    document.cookie = "modo_invitado=0; path=/; max-age=0";
+    sessionStorage.removeItem("perfilSeleccionado");
+    router.push("/entrar");
+  }
+
+  function irALogin() {
+    // Salir del modo invitado: borrar cookie y volver al login
+    document.cookie = "modo_invitado=0; path=/; max-age=0";
     sessionStorage.removeItem("perfilSeleccionado");
     router.push("/entrar");
   }
@@ -274,7 +287,7 @@ export default function Perfiles() {
       <div className="w-full max-w-sm flex flex-col items-center gap-10">
 
         {/* Cuenta activa y cierre de sesión */}
-        {emailCuenta && (
+        {emailCuenta ? (
           <div className="w-full flex items-center justify-between">
             <span className="text-xs text-mute truncate max-w-[200px]">{emailCuenta}</span>
             <button
@@ -284,7 +297,17 @@ export default function Perfiles() {
               Cerrar sesión
             </button>
           </div>
-        )}
+        ) : esModoInvitado ? (
+          <div className="w-full flex items-center justify-between">
+            <span className="text-xs text-mute">Modo sin cuenta</span>
+            <button
+              onClick={irALogin}
+              className="text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors"
+            >
+              Iniciar sesión →
+            </button>
+          </div>
+        ) : null}
 
         <h1 className="text-[22px] font-semibold text-ink">¿Quién eres?</h1>
 
