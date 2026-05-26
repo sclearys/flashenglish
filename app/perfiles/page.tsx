@@ -13,7 +13,7 @@ import {
 } from "@/lib/storage";
 import { AppState } from "@/lib/types";
 import { crearClienteSupabase } from "@/lib/supabase";
-import { descargarEstado } from "@/lib/nube";
+import { descargarEstado, subirEstado } from "@/lib/nube";
 import { guardarEstadoLocal } from "@/lib/storage";
 
 type Modo = "selector" | "crear" | "editar";
@@ -59,10 +59,21 @@ export default function Perfiles() {
 
     // Sincronizar desde Supabase en segundo plano.
     // Si la nube tiene datos, los usamos como fuente de verdad.
+    // Si la nube está vacía pero hay progreso local (primer login),
+    // subimos el estado local inmediatamente sin esperar ninguna acción del usuario.
     descargarEstado().then((estadoNube) => {
       if (estadoNube) {
         guardarEstadoLocal(estadoNube);
         setEstado(estadoNube);
+      } else {
+        // Nube vacía: migración de primer login.
+        // subirEstado() es no-op si no hay sesión activa (modo invitado).
+        const tieneProgreso = Object.values(estadoCargado.perfiles).some(
+          (p) =>
+            Object.keys(p.progreso_frases).length > 0 ||
+            Object.values(p.puntero_frase_nueva).some((v) => v > 0)
+        );
+        if (tieneProgreso) subirEstado(estadoCargado);
       }
     });
   }, []);
