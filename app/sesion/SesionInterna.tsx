@@ -435,6 +435,10 @@ export default function SesionInterna() {
               Revelar
             </button>
           ) : (
+            <>
+            <p className="w-full max-w-sm text-eyebrow font-semibold text-mute mb-2">
+              ¿Cómo lo has hecho?
+            </p>
             <div className={`w-full max-w-sm grid gap-[7px] ${snapshotAnterior ? "grid-cols-4" : "grid-cols-3"}`}>
               {snapshotAnterior && (
                 <button
@@ -463,6 +467,7 @@ export default function SesionInterna() {
                 Fluido
               </button>
             </div>
+            </>
           )}
         </div>
       )}
