@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   cargarEstado,
   cambiarPerfilActivo,
@@ -301,12 +302,21 @@ export default function Perfiles() {
         {emailCuenta ? (
           <div className="w-full flex items-center justify-between">
             <span className="text-xs text-mute truncate max-w-[200px]">{emailCuenta}</span>
-            <button
-              onClick={cerrarSesion}
-              className="text-xs font-medium text-body hover:text-ink transition-colors"
-            >
-              Cerrar sesión
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/preferencias"
+                className="text-2xl text-mute hover:text-body transition-colors leading-none"
+                title="Preferencias"
+              >
+                ⚙
+              </Link>
+              <button
+                onClick={cerrarSesion}
+                className="text-xs font-medium text-body hover:text-ink transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            </div>
           </div>
         ) : esModoInvitado ? (
           <div className="w-full flex items-center justify-between">

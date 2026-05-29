@@ -44,6 +44,14 @@ for (const frase of todasLasFrases) {
   }
 }
 
+// Posición de cada frase dentro de su bloque (para comparar con puntero_frase_nueva)
+const posicionPorFrase = new Map<string, number>();
+for (const bloque of BLOQUES_ORDENADOS) {
+  (frasesPorBloque.get(bloque.codigo) ?? []).forEach((f, i) =>
+    posicionPorFrase.set(f.id, i)
+  );
+}
+
 // Asignar nivel a cada tema grande por mayoría de frases
 // Empate → nivel más bajo (basic > intermediate > advanced)
 for (const tema of Array.from(_totalPorTema.keys())) {
@@ -120,15 +128,22 @@ export function frasesDelTemaEnNivel(perfil: Perfil, temaId: string): Frase[] {
   return resultado;
 }
 
-export function calcularProgresoTemas(perfil: Perfil): ProgresoPorTema[] {
-  // Índice de posición dentro del bloque para comparar con puntero_frase_nueva
-  const posicionPorFrase = new Map<string, number>();
-  for (const bloque of BLOQUES_ORDENADOS) {
-    (frasesPorBloque.get(bloque.codigo) ?? []).forEach((f, i) =>
-      posicionPorFrase.set(f.id, i)
-    );
+/** % de dominio de un sub-tema para el perfil dado (frases aprendidas / total en bloques desbloqueados). */
+export function dominioPorSubTema(subTema: string, perfil: Perfil): number {
+  const desbloqueados = new Set(perfil.bloques_desbloqueados);
+  let total = 0, aprendidas = 0;
+  for (const frase of todasLasFrases) {
+    if (!desbloqueados.has(frase.bloque)) continue;
+    if (!frase.temas_gramaticales.includes(subTema)) continue;
+    total++;
+    const pos = posicionPorFrase.get(frase.id) ?? Infinity;
+    const puntero = perfil.puntero_frase_nueva[frase.bloque] ?? 0;
+    if (pos < puntero && !(frase.id in perfil.progreso_frases)) aprendidas++;
   }
+  return total > 0 ? Math.round((aprendidas / total) * 100) : 0;
+}
 
+export function calcularProgresoTemas(perfil: Perfil): ProgresoPorTema[] {
   const aprendidasPorTema = new Map<string, number>();
   for (const [fraseId, temas] of Array.from(_temasGrandesPorFrase.entries())) {
     const frase = indiceFrases.get(fraseId);

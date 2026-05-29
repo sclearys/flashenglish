@@ -109,7 +109,7 @@ npm run lint     # comprobar lint
 - **Botón retroceder** (`‹`): aparece a la izquierda de Fallo solo desde la segunda tarjeta. Deshace la última evaluación restaurando un snapshot del estado anterior.
 - **Temas gramaticales**: se muestran todos los del array (pueden ser 2-3 por frase).
 - **Sesión más corta**: si hay menos de N frases disponibles, la sesión usa las que haya (no bloquea).
-- **Selector de frases por sesión**: 10 / 15 / 20 / 25. Por defecto 25. Se pasa por URL param (`/sesion?frases=10`).
+- **Selector de frases por sesión**: 10 / 15 / 20 / 25. Por defecto 15. Se pasa por URL param (`/sesion?frases=10`).
 - **Resumen**: usa `useRef` para evitar doble ejecución de `useEffect` en React StrictMode (modo desarrollo).
 
 ### Gotchas técnicos

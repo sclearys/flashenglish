@@ -57,6 +57,9 @@ export interface SesionEnCurso {
   // con sesiones guardadas antes de este campo. Usado en el backoffice para
   // detectar sesiones posiblemente atascadas (> 2h desde inicio).
   inicio?: string;   // ISO timestamp, p.ej. "2026-05-26T09:14:00.000Z"
+  // Pieza G: modo de evaluación elegido al inicio de la sesión.
+  // Ausencia = autoevaluacion (retrocompatible con sesiones antiguas).
+  modo?: "tutor" | "autoevaluacion";
 }
 
 // ── Perfil ────────────────────────────────────────────────────────────────
@@ -92,4 +95,8 @@ export interface AppState {
   version: number;
   perfil_activo: string;
   perfiles: Record<string, Perfil>;
+  // Preferencia del usuario sobre el tutor IA (Pieza G.5).
+  // Independiente de tutor_activo (columna DB): el admin siempre tiene la última palabra.
+  // undefined / true → quiere usar el tutor; false → prefiere no usarlo.
+  tutorPreferido?: boolean;
 }

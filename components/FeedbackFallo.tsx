@@ -8,6 +8,7 @@ interface Props {
   traduccionIngles: string;
   temasGramaticales: string[];
   resultado: ResultadoEval; // "casi" o "incorrecto"
+  explicacion?: string | null; // Explicación gramatical del tutor IA (G.2); ausente en autoevaluación
   onContinuar: () => void;
 }
 
@@ -17,6 +18,7 @@ export default function FeedbackFallo({
   fraseEspanol,
   traduccionIngles,
   temasGramaticales,
+  explicacion,
   onContinuar,
 }: Props) {
   const [segundosRestantes, setSegundosRestantes] = useState(DURACION_SEGUNDOS);
@@ -78,6 +80,13 @@ export default function FeedbackFallo({
             </p>
           ))}
         </div>
+
+        {/* Explicación gramatical del tutor (solo aparece en modo tutor) */}
+        {explicacion && (
+          <p className="text-sm font-medium text-body leading-snug italic">
+            {explicacion}
+          </p>
+        )}
 
         {/* Mensaje colaborativo — no comunicamos cuántas veces se repite (política de copy) */}
         <p className="text-sm font-medium text-body mt-1">

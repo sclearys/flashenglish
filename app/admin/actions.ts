@@ -472,6 +472,54 @@ export async function avanzarBloque(
   };
 }
 
+// ── Acciones de tutor virtual (G.4) ─────────────────────────────────────────
+
+/**
+ * Activa o desactiva el tutor virtual para un usuario concreto.
+ * Escribe directamente en la columna tutor_activo de estado_usuario.
+ */
+export async function setTutorActivo(
+  userId: string,
+  activo: boolean
+): Promise<ResultadoAccion> {
+  if (!(await verificarAdmin())) return { ok: false, error: "No autorizado." };
+
+  const supabase = crearClienteAdmin();
+  const { error } = await supabase
+    .from("estado_usuario")
+    .update({ tutor_activo: activo })
+    .eq("cuenta_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    mensaje: activo ? "Tutor activado." : "Tutor desactivado.",
+  };
+}
+
+/**
+ * Bloquea o desbloquea una cuenta de usuario.
+ * Escribe directamente en la columna bloqueado de estado_usuario.
+ */
+export async function setBloqueado(
+  userId: string,
+  bloqueado: boolean
+): Promise<ResultadoAccion> {
+  if (!(await verificarAdmin())) return { ok: false, error: "No autorizado." };
+
+  const supabase = crearClienteAdmin();
+  const { error } = await supabase
+    .from("estado_usuario")
+    .update({ bloqueado })
+    .eq("cuenta_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    mensaje: bloqueado ? "Cuenta bloqueada." : "Cuenta desbloqueada.",
+  };
+}
+
 // ── Acciones públicas ─────────────────────────────────────────────────────────
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import type { UsuarioResumen, PerfilResumen, DetalleUsuario, PerfilDetalle } from "./types";
+import type { UsuarioResumen, PerfilResumen, DetalleUsuario, PerfilDetalle, ConsumoGlobal } from "./types";
 import {
   obtenerDetalleUsuario,
   borrarSesionEnCurso,
@@ -10,6 +10,8 @@ import {
   retrocederBloque,
   resetearBloqueActivo,
   avanzarBloque,
+  setTutorActivo,
+  setBloqueado,
 } from "./actions";
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
@@ -192,7 +194,7 @@ function Toast({ msg, tipo }: { msg: string; tipo: "ok" | "warn" }) {
 
 // ── KPI ───────────────────────────────────────────────────────────────────────
 
-function KpiCard({ num, label, color }: { num: number; label: string; color?: string }) {
+function KpiCard({ num, label, color, sub }: { num: number | string; label: string; color?: string; sub?: string }) {
   return (
     <div style={{
       background: "#fff", border: `1px solid ${C.line}`, borderRadius: 14,
@@ -201,6 +203,7 @@ function KpiCard({ num, label, color }: { num: number; label: string; color?: st
     }}>
       <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: color ?? C.ink }}>{num}</div>
       <div style={{ fontSize: 12, color: C.mute, marginTop: 4, fontWeight: 500 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: C.mute2, marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
@@ -265,10 +268,22 @@ function FilaUsuario({
       </td>
       <td style={td}><span style={{ fontSize: 12, color: C.mute2 }}>{formatUltimaSesion(usuario.ultimaActualizacion)}</span></td>
       <td style={td}>
-        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: estado.color, display: "inline-block", flexShrink: 0 }} />
-          <span style={{ fontSize: 12 }}>{estado.label}</span>
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: estado.color, display: "inline-block", flexShrink: 0 }} />
+            <span style={{ fontSize: 12 }}>{estado.label}</span>
+          </span>
+          {usuario.evaluacionesHoy > 0 && (
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: C.amberBg, color: C.amber, width: "fit-content" }}>
+              IA: {usuario.evaluacionesHoy} eval.
+            </span>
+          )}
+          {usuario.bloqueado && (
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: C.redBg, color: C.red, width: "fit-content" }}>
+              Bloqueado
+            </span>
+          )}
+        </div>
       </td>
       <td style={td}>
         <button onClick={(e) => { e.stopPropagation(); onVer(); }} style={{ fontSize: 12, fontWeight: 600, padding: "5px 11px", borderRadius: 6, border: `1px solid ${seleccionado ? C.ink2 : C.orange}`, background: seleccionado ? C.surface : C.orange, color: seleccionado ? C.ink : "#fff", cursor: "pointer", fontFamily: "inherit" }}>
@@ -494,16 +509,22 @@ function SeccionAcciones({
 // ── Panel de detalle ──────────────────────────────────────────────────────────
 
 function PanelDetalle({
-  detalle, onCerrar, onAction, userId,
+  detalle, onCerrar, onAction, userId, tutorActivoInicial, bloqueadoInicial, evaluacionesHoy,
 }: {
   detalle: DetalleUsuario;
   onCerrar: () => void;
   onAction: (config: ModalConfig) => void;
   userId: string;
+  tutorActivoInicial: boolean;
+  bloqueadoInicial: boolean;
+  evaluacionesHoy: number;
 }) {
   const [perfilIdx, setPerfilIdx] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const perfil: PerfilDetalle = detalle.perfiles[perfilIdx] ?? detalle.perfiles[0];
+  // Estado local para las acciones de IA: se actualiza optimistamente sin reload de página.
+  const [tutorActivo, setTutorActivoLocal] = useState(tutorActivoInicial);
+  const [bloqueado, setBloqueadoLocal] = useState(bloqueadoInicial);
 
   useEffect(() => { panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [detalle.id]);
   useEffect(() => { setPerfilIdx(0); }, [detalle.id]);
@@ -527,6 +548,56 @@ function PanelDetalle({
           <div style={{ fontSize: 13, color: C.mute }}>{detalle.email}</div>
         </div>
         <button onClick={onCerrar} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 20, color: C.mute, lineHeight: 1, padding: 4 }}>✕</button>
+      </div>
+
+      {/* Barra de control de tutor IA */}
+      <div style={{ padding: "14px 24px", borderBottom: `1px solid ${C.surface}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.mute, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: 4 }}>Tutor IA</div>
+
+        {/* Eval hoy */}
+        <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: evaluacionesHoy > 0 ? C.amberBg : C.surface, color: evaluacionesHoy > 0 ? C.amber : C.mute }}>
+          {evaluacionesHoy} eval. hoy
+        </span>
+
+        {/* Toggle tutor activo */}
+        <button
+          onClick={() => onAction({
+            titulo: tutorActivo ? "Desactivar tutor" : "Activar tutor",
+            cuerpo: tutorActivo
+              ? <span>El botón &ldquo;Con tutor&rdquo; quedará <strong>deshabilitado</strong> para <strong>{detalle.nombreDisplay}</strong>. Podrá seguir usando la app en modo autoevaluación.</span>
+              : <span>El tutor virtual quedará <strong>activado</strong> de nuevo para <strong>{detalle.nombreDisplay}</strong>.</span>,
+            confirmLabel: tutorActivo ? "Desactivar" : "Activar",
+            esPeligroso: false,
+            onConfirm: async () => {
+              const r = await setTutorActivo(userId, !tutorActivo);
+              if (!r.ok) throw new Error(r.error);
+              setTutorActivoLocal(!tutorActivo);
+            },
+          })}
+          style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${tutorActivo ? C.green : C.line}`, background: tutorActivo ? C.greenBg : C.surface, color: tutorActivo ? C.green : C.mute }}
+        >
+          {tutorActivo ? "✓ Tutor activo" : "✗ Tutor off"}
+        </button>
+
+        {/* Toggle bloqueado */}
+        <button
+          onClick={() => onAction({
+            titulo: bloqueado ? "Desbloquear cuenta" : "Bloquear cuenta",
+            cuerpo: bloqueado
+              ? <span>La cuenta de <strong>{detalle.nombreDisplay}</strong> quedará <strong>desbloqueada</strong>. Podrá usar el tutor con normalidad.</span>
+              : <span>La cuenta de <strong>{detalle.nombreDisplay}</strong> quedará <strong>bloqueada</strong>. Cualquier llamada al tutor será rechazada.</span>,
+            confirmLabel: bloqueado ? "Desbloquear" : "Bloquear cuenta",
+            esPeligroso: !bloqueado,
+            onConfirm: async () => {
+              const r = await setBloqueado(userId, !bloqueado);
+              if (!r.ok) throw new Error(r.error);
+              setBloqueadoLocal(!bloqueado);
+            },
+          })}
+          style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${bloqueado ? C.red : C.line}`, background: bloqueado ? C.redBg : C.surface, color: bloqueado ? C.red : C.mute }}
+        >
+          {bloqueado ? "⛔ Bloqueado" : "Bloquear"}
+        </button>
       </div>
 
       {/* Pestañas de perfil */}
@@ -642,7 +713,7 @@ function PanelDetalle({
 
 type Tab = "usuarios" | "contenido" | "gramatica";
 
-export default function AdminPanel({ usuarios }: { usuarios: UsuarioResumen[] }) {
+export default function AdminPanel({ usuarios, consumoGlobal }: { usuarios: UsuarioResumen[]; consumoGlobal: ConsumoGlobal }) {
   const [busqueda, setBusqueda] = useState("");
   const [tabActiva, setTabActiva] = useState<Tab>("usuarios");
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
@@ -732,12 +803,18 @@ export default function AdminPanel({ usuarios }: { usuarios: UsuarioResumen[] })
       <main style={{ maxWidth: 1280, margin: "0 auto", width: "100%", padding: "28px 28px 80px" }}>
         {tabActiva === "usuarios" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 28 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 28 }}>
               <KpiCard num={totalCuentas} label="Cuentas totales" color={C.orange} />
               <KpiCard num={activasEnSiete} label="Activas (7 días)" color={C.green} />
               <KpiCard num={totalPerfiles} label="Perfiles en uso" />
               <KpiCard num={rachaMaxima} label="Racha máxima (días)" color={C.green} />
               <KpiCard num={sesionesEnCurso} label="Sesiones en curso" color={sesionesEnCurso > 0 ? C.amber : undefined} />
+              <KpiCard
+                num={consumoGlobal.totalHoy}
+                label={consumoGlobal.alerta ? "⚠️ Eval. IA hoy — ALERTA" : "Eval. IA hoy"}
+                color={consumoGlobal.alerta ? C.red : C.amber}
+                sub={`~€${consumoGlobal.costeEstimadoEurHoy.toFixed(3)} estimado`}
+              />
             </div>
 
             <div style={{ background: "#fff", border: `1px solid ${C.line}`, borderRadius: 14, boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04)", overflow: "hidden" }}>
@@ -773,14 +850,20 @@ export default function AdminPanel({ usuarios }: { usuarios: UsuarioResumen[] })
               </div>
             )}
 
-            {!cargando && detalle && seleccionadoId && (
-              <PanelDetalle
-                detalle={detalle}
-                onCerrar={() => { setSeleccionadoId(null); setDetalle(null); }}
-                onAction={abrirModal}
-                userId={seleccionadoId}
-              />
-            )}
+            {!cargando && detalle && seleccionadoId && (() => {
+              const usuarioSel = usuarios.find((u) => u.id === seleccionadoId);
+              return (
+                <PanelDetalle
+                  detalle={detalle}
+                  onCerrar={() => { setSeleccionadoId(null); setDetalle(null); }}
+                  onAction={abrirModal}
+                  userId={seleccionadoId}
+                  tutorActivoInicial={usuarioSel?.tutorActivo ?? true}
+                  bloqueadoInicial={usuarioSel?.bloqueado ?? false}
+                  evaluacionesHoy={usuarioSel?.evaluacionesHoy ?? 0}
+                />
+              );
+            })()}
           </>
         )}
 

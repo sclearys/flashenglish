@@ -16,9 +16,13 @@
 
 import { crearClienteAdmin } from "@/lib/supabase-admin";
 import AdminPanel from "./AdminPanel";
-import type { UsuarioResumen, PerfilResumen } from "./types";
+import type { UsuarioResumen, PerfilResumen, ConsumoGlobal } from "./types";
 import type { AppState } from "@/lib/types";
 import catalogo from "@/data/content.json";
+import {
+  UMBRAL_ALERTA_GLOBAL_DIA,
+  COSTE_ESTIMADO_EUR_POR_EVALUACION,
+} from "@/lib/tutor";
 
 // Totales de frases por bloque, calculados una vez al cargar el módulo.
 // Necesarios para calcular el % de progreso del bloque activo.
@@ -53,7 +57,7 @@ export default async function AdminPage() {
   // ── 2. Leer todos los AppState de estado_usuario ─────────────────────────
   const { data: estados, error: estadosError } = await supabase
     .from("estado_usuario")
-    .select("cuenta_id, estado, actualizado_en");
+    .select("cuenta_id, estado, actualizado_en, tutor_activo, bloqueado");
 
   if (estadosError) {
     return (
@@ -67,6 +71,26 @@ export default async function AdminPage() {
   const estadoPorUsuario = new Map(
     (estados ?? []).map((e) => [e.cuenta_id, e])
   );
+
+  // ── 3b. Leer evaluaciones del tutor de hoy ───────────────────────────────
+  const hoyISO = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const { data: evaluacionesHoyRows } = await supabase
+    .from("evaluaciones_tutor")
+    .select("cuenta_id")
+    .gte("creado_en", `${hoyISO}T00:00:00.000Z`);
+
+  // Agrupar por usuario: Map<userId, count>
+  const evalHoyPorUsuario = new Map<string, number>();
+  for (const row of evaluacionesHoyRows ?? []) {
+    evalHoyPorUsuario.set(row.cuenta_id, (evalHoyPorUsuario.get(row.cuenta_id) ?? 0) + 1);
+  }
+  const totalEvalHoy = evaluacionesHoyRows?.length ?? 0;
+
+  const consumoGlobal: ConsumoGlobal = {
+    totalHoy: totalEvalHoy,
+    costeEstimadoEurHoy: Math.round(totalEvalHoy * COSTE_ESTIMADO_EUR_POR_EVALUACION * 1000) / 1000,
+    alerta: totalEvalHoy > UMBRAL_ALERTA_GLOBAL_DIA,
+  };
 
   // ── 4. Construir UsuarioResumen[] ────────────────────────────────────────
   const usuariosResumen: UsuarioResumen[] = users.map((user) => {
@@ -92,6 +116,9 @@ export default async function AdminPage() {
         perfilActivoId: "",
         perfiles: [],
         tieneEstado: false,
+        tutorActivo: estadoRow?.tutor_activo ?? true,
+        bloqueado: estadoRow?.bloqueado ?? false,
+        evaluacionesHoy: evalHoyPorUsuario.get(user.id) ?? 0,
       } satisfies UsuarioResumen;
     }
 
@@ -129,8 +156,11 @@ export default async function AdminPage() {
       perfilActivoId: appState.perfil_activo,
       perfiles,
       tieneEstado: true,
+      tutorActivo: estadoRow?.tutor_activo ?? true,
+      bloqueado: estadoRow?.bloqueado ?? false,
+      evaluacionesHoy: evalHoyPorUsuario.get(user.id) ?? 0,
     } satisfies UsuarioResumen;
   });
 
-  return <AdminPanel usuarios={usuariosResumen} />;
+  return <AdminPanel usuarios={usuariosResumen} consumoGlobal={consumoGlobal} />;
 }

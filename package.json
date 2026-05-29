@@ -10,6 +10,7 @@
     "audit": "node scripts/auditoria-contenido.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.99.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@tabler/icons-react": "^3.44.0",

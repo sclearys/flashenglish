@@ -5,27 +5,34 @@ import { useRouter } from "next/navigation";
 import { cargarEstado, aplicarResultadoTest } from "@/lib/storage";
 import { BLOQUES_ORDENADOS } from "@/lib/catalogo";
 import {
-  FASES_TEST,
-  MAX_FRASES_TEST,
   EstadoTest,
+  ResultadoTest,
   iniciarTest,
-  evaluarRespuesta,
-  numeroPreguntaActual,
+  registrarRespuesta,
+  testCompletado,
+  calcularSiguienteFase,
+  calcularResultado,
+  getFraseTest,
+  FraseTest,
 } from "@/lib/testNivel";
 import { AppState } from "@/lib/types";
+
+type PantallaUI = "inicio" | "test" | "resultado";
 
 export default function TestNivelInterno() {
   const router = useRouter();
   const [appState, setAppState] = useState<AppState | null>(null);
+  const [pantallaUI, setPantallaUI] = useState<PantallaUI>("inicio");
   const [estadoTest, setEstadoTest] = useState<EstadoTest | null>(null);
-  const [revelada, setRevelada] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoTest | null>(null);
+  const [fraseActual, setFraseActual] = useState<FraseTest | null>(null);
+  const [indiceFraseActual, setIndiceFraseActual] = useState(0);
 
   useEffect(() => {
     setAppState(cargarEstado());
-    setEstadoTest(iniciarTest());
   }, []);
 
-  if (!appState || !estadoTest) {
+  if (!appState) {
     return (
       <main className="min-h-screen bg-white flex items-center justify-center">
         <p className="text-body text-sm">Cargando...</p>
@@ -33,43 +40,151 @@ export default function TestNivelInterno() {
     );
   }
 
-  // ── Pantalla de resultado ─────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  if (estadoTest.terminado && estadoTest.bloqueResultado) {
-    const bloqueInfo = BLOQUES_ORDENADOS.find(
-      (b) => b.codigo === estadoTest.bloqueResultado
-    );
+  function empezarDesdeElPrincipio() {
+    aplicarResultadoTest(appState!, "BASIC1");
+    router.push("/");
+  }
 
-    const confirmarResultado = () => {
-      aplicarResultadoTest(appState, estadoTest.bloqueResultado!);
-      router.push("/");
-    };
+  function empezarTest() {
+    const estado = iniciarTest();
+    setEstadoTest(estado);
+    setIndiceFraseActual(0);
+    setFraseActual(getFraseTest(estado.frasesActuales[0]));
+    setPantallaUI("test");
+  }
 
+  function responder(sabe: boolean) {
+    if (!estadoTest || !fraseActual) return;
+
+    const idActual = fraseActual.id;
+    let nuevoEstado = registrarRespuesta(estadoTest, idActual, sabe);
+
+    if (testCompletado(nuevoEstado)) {
+      if (nuevoEstado.fase === "fase1") {
+        nuevoEstado = calcularSiguienteFase(nuevoEstado);
+        setEstadoTest(nuevoEstado);
+        setIndiceFraseActual(0);
+        setFraseActual(getFraseTest(nuevoEstado.frasesActuales[0]));
+      } else {
+        // fase2 completada → calcular resultado
+        const res = calcularResultado(nuevoEstado);
+        const nuevoAppState = aplicarResultadoTest(appState!, res.bloqueAsignado);
+        setAppState(nuevoAppState);
+        setResultado(res);
+        setPantallaUI("resultado");
+      }
+    } else {
+      const siguienteIndice = indiceFraseActual + 1;
+      setEstadoTest(nuevoEstado);
+      setIndiceFraseActual(siguienteIndice);
+      setFraseActual(getFraseTest(nuevoEstado.frasesActuales[siguienteIndice]));
+    }
+  }
+
+  // ── Pantalla de inicio ────────────────────────────────────────────────────
+
+  if (pantallaUI === "inicio") {
     return (
       <main className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
-        <div className="w-full max-w-sm flex flex-col items-center gap-6">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <p className="text-eyebrow font-semibold uppercase text-mute">TU NIVEL</p>
-            <h1 className="text-[28px] font-semibold text-ink leading-tight">
-              {bloqueInfo?.nombre ?? estadoTest.bloqueResultado}
+        <div className="w-full max-w-sm flex flex-col items-center gap-6 text-center">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-[26px] font-semibold text-ink leading-tight">
+              Encuentra tu punto de partida
             </h1>
-            <p className="text-sm text-mute">
-              Empezarás directamente en este bloque.
+            <p className="text-sm text-mute leading-relaxed">
+              Vamos a mostrarte unas frases. Di si las sabes o no. El test dura
+              unos 2 minutos y no hay trampa: cuanto más honesto seas, mejor el
+              resultado.
             </p>
           </div>
 
           <button
-            onClick={confirmarResultado}
+            onClick={empezarTest}
             className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
           >
-            Empezar a practicar
+            Empezar
           </button>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={empezarDesdeElPrincipio}
             className="text-sm font-medium text-mute hover:text-ink transition-colors"
           >
-            Cancelar, volver al inicio
+            Prefiero empezar desde el principio
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // ── Pantalla de resultado ─────────────────────────────────────────────────
+
+  if (pantallaUI === "resultado" && resultado) {
+    const bloqueInfo = BLOQUES_ORDENADOS.find(
+      (b) => b.codigo === resultado.bloqueAsignado
+    );
+    const siguienteBloque = BLOQUES_ORDENADOS.find(
+      (b) =>
+        b.orden ===
+        (BLOQUES_ORDENADOS.find((x) => x.codigo === resultado.bloqueAsignado)
+          ?.orden ?? 0) +
+          1
+    );
+
+    return (
+      <main className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm flex flex-col items-center gap-6 text-center">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-[24px] font-semibold text-ink leading-tight">
+              Hemos encontrado tu punto de partida.
+            </h1>
+
+            <p className="text-[18px] font-semibold text-ink">
+              Comenzarás en {bloqueInfo?.nombre ?? resultado.bloqueAsignado}.
+            </p>
+
+            {resultado.esCasoExtremo && resultado.bloqueAsignado === "ADV2" ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-mute leading-relaxed">
+                  Dominas un nivel alto de inglés. Comenzarás en el bloque más
+                  avanzado del catálogo.
+                </p>
+                <p className="text-sm text-mute leading-relaxed">
+                  Este será tu mayor reto.
+                </p>
+              </div>
+            ) : resultado.esCasoExtremo && resultado.bloqueAsignado === "BASIC1" ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-mute leading-relaxed">
+                  Vamos a empezar por el principio, que es el mejor sitio para
+                  construir una base sólida.
+                </p>
+                <p className="text-sm text-mute leading-relaxed">
+                  Las primeras frases son cortas y directas. Las dominarás antes
+                  de lo que crees.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-mute leading-relaxed">
+                  Ya dominas gran parte de los bloques anteriores. Este es el
+                  mejor punto para avanzar con fluidez.
+                </p>
+                {siguienteBloque && (
+                  <p className="text-sm text-mute leading-relaxed">
+                    Tu siguiente reto será {siguienteBloque.nombre}.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => router.push("/")}
+            className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
+          >
+            Empezar a entrenar
           </button>
         </div>
       </main>
@@ -78,15 +193,9 @@ export default function TestNivelInterno() {
 
   // ── Pantalla de test ──────────────────────────────────────────────────────
 
-  const faseActual = FASES_TEST[estadoTest.fase];
-  const fraseActual = faseActual.frases[estadoTest.indiceFrase];
-  const numeroPregunta = numeroPreguntaActual(estadoTest);
-  const porcentaje = Math.round(((numeroPregunta - 1) / MAX_FRASES_TEST) * 100);
+  if (!fraseActual) return null;
 
-  function responder(correcto: boolean) {
-    setEstadoTest((prev) => evaluarRespuesta(prev!, correcto));
-    setRevelada(false);
-  }
+  const progresoDots = estadoTest!.frasesActuales.map((id) => id in estadoTest!.respuestas);
 
   return (
     <main className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
@@ -99,57 +208,48 @@ export default function TestNivelInterno() {
         >
           Saltar test
         </button>
-        <span className="font-sans font-medium text-sm text-ink tabular-nums">
-          {numeroPregunta} / {MAX_FRASES_TEST}
-        </span>
-      </div>
-
-      {/* Barra de progreso */}
-      <div className="w-full max-w-sm flex gap-[3px] mb-10">
-        <div
-          className="h-1 rounded-full bg-brand-500 transition-all duration-[400ms] ease-out"
-          style={{ width: `${Math.max(porcentaje, 2)}%` }}
-        />
-        <div className="h-1 rounded-full bg-brand-100 flex-1" />
+        {/* Indicador visual sin cifras: puntos */}
+        <div className="flex gap-[5px] items-center">
+          {progresoDots.map((hecho, i) => (
+            <span
+              key={i}
+              className={`w-2 h-2 rounded-full transition-all ${
+                hecho
+                  ? "bg-brand-500"
+                  : i === indiceFraseActual
+                  ? "bg-brand-300"
+                  : "bg-brand-100"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Tarjeta */}
       <div key={fraseActual.id} className="w-full flex flex-col items-center animate-slide-in">
-        <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-3">
-          <span className="text-eyebrow font-semibold uppercase text-mute">TRADUCE</span>
-          <p className="text-[18px] font-semibold text-body leading-snug">{fraseActual.es}</p>
+        <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-6">
+          <span className="text-eyebrow font-semibold uppercase text-mute">
+            ¿Lo sabes?
+          </span>
+          <p className="text-[18px] font-semibold text-body leading-snug">
+            {fraseActual.es}
+          </p>
         </div>
 
-        {revelada && (
-          <div className="w-full max-w-sm bg-brand-100 rounded-lg px-[14px] py-[18px] border border-brand-500/20 flex flex-col gap-2 mb-6">
-            <span className="text-eyebrow font-semibold uppercase text-brand-700">ENGLISH</span>
-            <p className="text-[18px] font-semibold text-ink leading-snug">{fraseActual.en}</p>
-          </div>
-        )}
-
-        {!revelada ? (
+        <div className="w-full max-w-sm grid grid-cols-2 gap-[7px]">
           <button
-            onClick={() => setRevelada(true)}
-            className="w-full max-w-sm h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all mt-3"
+            onClick={() => responder(false)}
+            className="h-12 rounded-md bg-white border border-danger text-danger text-sm font-semibold hover:brightness-95 transition-all"
           >
-            Revelar
+            No lo sé
           </button>
-        ) : (
-          <div className="w-full max-w-sm grid grid-cols-2 gap-[7px]">
-            <button
-              onClick={() => responder(false)}
-              className="h-12 rounded-md bg-white border border-danger text-danger text-sm font-semibold hover:brightness-95 transition-all"
-            >
-              No lo sé
-            </button>
-            <button
-              onClick={() => responder(true)}
-              className="h-12 rounded-md bg-success text-white text-sm font-semibold hover:brightness-95 transition-all"
-            >
-              Lo sé
-            </button>
-          </div>
-        )}
+          <button
+            onClick={() => responder(true)}
+            className="h-12 rounded-md bg-success text-white text-sm font-semibold hover:brightness-95 transition-all"
+          >
+            Lo sé
+          </button>
+        </div>
       </div>
     </main>
   );

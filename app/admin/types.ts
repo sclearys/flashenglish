@@ -28,6 +28,17 @@ export type UsuarioResumen = {
   perfilActivoId: string;           // "perfil_1" | etc.
   perfiles: PerfilResumen[];        // todos los perfiles del AppState
   tieneEstado: boolean;             // false si aún no tiene fila en estado_usuario
+  // Pieza G.4: control de coste del tutor virtual
+  tutorActivo: boolean;             // admin puede desactivar el tutor para este usuario
+  bloqueado: boolean;               // cuenta bloqueada
+  evaluacionesHoy: number;          // evaluaciones IA hechas hoy
+};
+
+// Datos globales de consumo del tutor virtual (para la cabecera del panel de admin).
+export type ConsumoGlobal = {
+  totalHoy: number;
+  costeEstimadoEurHoy: number;   // totalHoy * COSTE_ESTIMADO_EUR_POR_EVALUACION
+  alerta: boolean;               // true si totalHoy > UMBRAL_ALERTA_GLOBAL_DIA
 };
 
 // ── Tipos del panel de detalle (It-3) ────────────────────────────────────────

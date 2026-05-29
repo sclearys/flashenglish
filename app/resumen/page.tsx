@@ -8,6 +8,7 @@ import { RespuestaSesion } from "@/lib/types";
 interface TemaRepasar {
   tema: string;
   count: number;
+  dominioPct: number;
 }
 
 interface ResumenData {
@@ -66,10 +67,10 @@ export default function Resumen() {
 
   const esRefuerzo = datos.tipo === "refuerzo";
   const { total, respuestas } = datos;
-  const perfectas = respuestas.filter((r) => r.resultado === "perfecto").length;
+  const dominadas = respuestas.filter((r) => r.resultado === "perfecto").length;
   const casi = respuestas.filter((r) => r.resultado === "casi").length;
   const incorrectas = respuestas.filter((r) => r.resultado === "incorrecto").length;
-  const porcentaje = total > 0 ? Math.round((perfectas / total) * 100) : 0;
+  const porcentaje = total > 0 ? Math.round((dominadas / total) * 100) : 0;
 
   const bloqueInfo = datos.bloque
     ? BLOQUES_ORDENADOS.find((b) => b.codigo === datos.bloque)
@@ -78,8 +79,6 @@ export default function Resumen() {
     datos.aprendidas_despues !== undefined && datos.aprendidas_antes !== undefined
       ? datos.aprendidas_despues - datos.aprendidas_antes
       : null;
-
-  const totalFallos = datos.temas_repasar?.reduce((s, t) => s + t.count, 0) ?? 0;
 
   return (
     <main className="min-h-screen bg-white flex flex-col items-center px-4 py-10">
@@ -103,13 +102,13 @@ export default function Resumen() {
           )}
         </div>
 
-        {/* 3 chips de resultado */}
+        {/* Marcadores: Dominado / Casi / Fallo */}
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col items-center gap-1 bg-success/10 rounded-xl py-3">
             <span className="text-[22px] font-semibold text-success tabular-nums leading-none">
-              {perfectas}
+              {dominadas}
             </span>
-            <span className="text-[11px] text-success font-medium">Fluido</span>
+            <span className="text-[11px] text-success font-medium">Dominado</span>
           </div>
           <div className="flex flex-col items-center gap-1 rounded-xl py-3" style={{ backgroundColor: "#FFC85726" }}>
             <span className="text-[22px] font-semibold tabular-nums leading-none" style={{ color: "#5C3F00" }}>
@@ -125,7 +124,49 @@ export default function Resumen() {
           </div>
         </div>
 
-        {/* Card de progreso del bloque — solo en sesión normal */}
+        {/* Temas de esta sesión — solo en sesión normal, va antes del bloque */}
+        {!esRefuerzo && datos.temas_sesion && datos.temas_sesion.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-eyebrow font-semibold uppercase text-mute">
+              TEMAS DE ESTA SESIÓN
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {datos.temas_sesion.map((tema) => (
+                <span
+                  key={tema}
+                  className="text-xs font-medium text-brand-600 bg-brand-50 rounded-full px-3 py-1"
+                >
+                  {tema}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Temas a reforzar — reemplaza "Por repasar" */}
+        {datos.temas_repasar && datos.temas_repasar.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-eyebrow font-semibold uppercase text-mute">TEMAS A REFORZAR</p>
+            <div className="flex flex-col gap-2">
+              {datos.temas_repasar.map(({ tema, dominioPct }) => (
+                <div key={tema} className="flex flex-col gap-1.5 bg-surface rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-ink">{tema}</p>
+                    <span className="text-xs text-mute tabular-nums">{dominioPct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-brand-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-brand-500 transition-all duration-500"
+                      style={{ width: animado ? `${dominioPct}%` : "0%" }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bloque de avance — al final, solo en sesión normal */}
         {!esRefuerzo &&
           bloqueInfo &&
           datos.aprendidas_antes !== undefined &&
@@ -161,48 +202,6 @@ export default function Resumen() {
           </div>
         )}
 
-        {/* Por repasar */}
-        {datos.temas_repasar && datos.temas_repasar.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <p className="text-eyebrow font-semibold uppercase text-mute">POR REPASAR</p>
-              <span className="text-xs font-semibold text-danger bg-danger/10 rounded-full px-2.5 py-0.5">
-                {totalFallos} {totalFallos === 1 ? "fallo" : "fallos"}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {datos.temas_repasar.map(({ tema, count }) => (
-                <div
-                  key={tema}
-                  className="flex items-center justify-between border-l-2 border-danger pl-3 py-1"
-                >
-                  <p className="text-sm font-semibold text-ink">{tema}</p>
-                  <span className="text-sm text-mute tabular-nums">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Temas de esta sesión — solo en sesión normal */}
-        {!esRefuerzo && datos.temas_sesion && datos.temas_sesion.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-eyebrow font-semibold uppercase text-mute">
-              TEMAS DE ESTA SESIÓN
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {datos.temas_sesion.map((tema) => (
-                <span
-                  key={tema}
-                  className="text-xs font-medium text-body bg-surface rounded-full px-3 py-1"
-                >
-                  {tema}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Botones */}
         <div className="flex flex-col gap-2 pt-1">
           {esRefuerzo ? (
@@ -215,13 +214,13 @@ export default function Resumen() {
                 }
                 className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
               >
-                Otra sesión
+                Otra sesión →
               </button>
               <button
                 onClick={() => router.push("/mi-trayectoria")}
                 className="w-full h-12 rounded-md bg-white border border-brand-100 text-ink text-sm font-semibold hover:border-brand-300 transition-all"
               >
-                Volver a Mi trayectoria
+                Terminar
               </button>
             </>
           ) : (
@@ -230,7 +229,7 @@ export default function Resumen() {
                 onClick={() => router.push("/sesion?frases=25&nueva=1")}
                 className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
               >
-                Otra sesión
+                Otra sesión →
               </button>
               <button
                 onClick={() => router.push("/")}
