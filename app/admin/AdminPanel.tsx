@@ -856,15 +856,6 @@ function PanelContenido({ frases, usagePorFrase }: { frases: FraseContenido[]; u
   );
 }
 
-function PlaceholderSubTab({ icono, titulo, desc }: { icono: string; titulo: string; desc: string }) {
-  return (
-    <div style={{ textAlign: "center", padding: "60px 24px", color: C.mute }}>
-      <div style={{ fontSize: 36, marginBottom: 14 }}>{icono}</div>
-      <p style={{ fontWeight: 700, fontSize: 17, color: C.ink, marginBottom: 8 }}>{titulo}</p>
-      <p style={{ fontSize: 14, maxWidth: 400, margin: "0 auto" }}>{desc}</p>
-    </div>
-  );
-}
 
 export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFrase }: { usuarios: UsuarioResumen[]; consumoGlobal: ConsumoGlobal; frases: FraseContenido[]; usagePorFrase: Record<string, UsageStats> }) {
   const router = useRouter();
