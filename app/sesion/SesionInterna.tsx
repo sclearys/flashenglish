@@ -75,7 +75,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
   const [blobGrabacion, setBlobGrabacion] = useState<Blob | null>(null);
   // Estado de la grabación en curso: idle → grabando → procesando → idle
   const [estadoGrabacion, setEstadoGrabacion] = useState<
-    "idle" | "grabando" | "procesando"
+    "idle" | "grabando" | "confirmando" | "procesando"
   >("idle");
   const [veredictoIA, setVeredictoIA] = useState<ResultadoEval | null>(null);
   const [transcripcionUsuario, setTranscripcionUsuario] = useState<string | null>(null);
@@ -440,6 +440,9 @@ export default function SesionInterna({ tutorActivo }: Props) {
         setAnimandoPerfecto(false);
         avanzarTarjeta(estadoActualizado, sesionConRespuesta);
       }, 250);
+    } else if (esTutor && !fallbackAutoeval && veredictoIA) {
+      // En modo tutor el veredicto ya se mostró inline — no hay pantalla de feedback separada.
+      avanzarTarjeta(estadoActualizado, sesionConRespuesta);
     } else {
       setDatosFeedback({ resultado, frase: fraseActual!, explicacion: explicacionIA });
       setPantalla("feedback");
@@ -581,50 +584,19 @@ export default function SesionInterna({ tutorActivo }: Props) {
 
   // ── Función de grabación (necesita fraseActual, por eso va aquí) ──────────
 
-  async function iniciarGrabacion() {
+  function iniciarGrabacion() {
     if (estadoGrabacion !== "idle" || !fraseActual) return;
-    // Capturamos fraseActual en una constante local antes del callback async.
-    // TypeScript necesita esto para garantizar que el valor no es undefined
-    // dentro de la closure asíncrona.
-    const frase = fraseActual;
     setErrorGrabacion(false);
+    setTranscripcionUsuario(null);
     setEstadoGrabacion("grabando");
 
     iniciarReconocimiento({
       lang: "en-US",
-      onResult: async (texto: string) => {
-        setEstadoGrabacion("procesando");
+      onResult: (texto: string) => {
+        // El STT transcribió algo: mostrarlo al usuario para que confirme/edite
+        // antes de enviarlo a la IA. Esto es el paso de confirmación del nuevo flujo.
         setTranscripcionUsuario(texto);
-        try {
-          const resultado = await evaluarConTutor(
-            texto,
-            frase.en,
-            frase.temas_gramaticales,
-            frase.id
-          );
-          if ("error" in resultado) {
-            // Un anillo de control bloqueó la llamada (cap diario, tutor desactivado, etc.)
-            const mensajes: Record<string, string> = {
-              cap_diario:       "Has alcanzado el límite de evaluaciones de hoy. Autoevalúate tú.",
-              bloqueado:        "Esta cuenta no puede usar el tutor. Autoevalúate tú.",
-              tutor_desactivado: "El tutor está desactivado. Autoevalúate tú.",
-              no_autenticado:   "Sesión expirada. Vuelve a entrar e inténtalo de nuevo.",
-            };
-            setMensajeErrorIA(mensajes[resultado.error] ?? "No se pudo evaluar. Autoevalúate tú.");
-            setEstadoGrabacion("idle");
-            setErrorGrabacion(true);
-          } else {
-            setVeredictoIA(resultado.veredicto);
-            setExplicacionIA(resultado.explicacion ?? null);
-            setRevelada(true);
-            setEstadoGrabacion("idle");
-          }
-        } catch {
-          // Error de red o fallo inesperado de la API — ofrecemos autoevaluación manual.
-          setMensajeErrorIA("No se pudo evaluar. Autoevalúate tú.");
-          setEstadoGrabacion("idle");
-          setErrorGrabacion(true);
-        }
+        setEstadoGrabacion("confirmando");
       },
       onError: () => {
         setEstadoGrabacion("idle");
@@ -634,6 +606,41 @@ export default function SesionInterna({ tutorActivo }: Props) {
         // No hacemos nada aquí; onResult u onError ya gestionaron el resultado.
       },
     });
+  }
+
+  async function evaluarTranscripcion() {
+    if (!transcripcionUsuario?.trim() || !fraseActual) return;
+    const frase = fraseActual;
+    const texto = transcripcionUsuario;
+    setEstadoGrabacion("procesando");
+    try {
+      const resultado = await evaluarConTutor(
+        texto,
+        frase.en,
+        frase.temas_gramaticales,
+        frase.id
+      );
+      if ("error" in resultado) {
+        const mensajes: Record<string, string> = {
+          cap_diario:        "Has alcanzado el límite de evaluaciones de hoy. Autoevalúate tú.",
+          bloqueado:         "Esta cuenta no puede usar el tutor. Autoevalúate tú.",
+          tutor_desactivado: "El tutor está desactivado. Autoevalúate tú.",
+          no_autenticado:    "Sesión expirada. Vuelve a entrar e inténtalo de nuevo.",
+        };
+        setMensajeErrorIA(mensajes[resultado.error] ?? "No se pudo evaluar. Autoevalúate tú.");
+        setEstadoGrabacion("idle");
+        setErrorGrabacion(true);
+      } else {
+        setVeredictoIA(resultado.veredicto);
+        setExplicacionIA(resultado.explicacion ?? null);
+        setRevelada(true);
+        setEstadoGrabacion("idle");
+      }
+    } catch {
+      setMensajeErrorIA("No se pudo evaluar. Autoevalúate tú.");
+      setEstadoGrabacion("idle");
+      setErrorGrabacion(true);
+    }
   }
 
   // ── Render principal ──────────────────────────────────────────────────────
@@ -839,41 +846,102 @@ export default function SesionInterna({ tutorActivo }: Props) {
                 </div>
               </>
             ) : !revelada ? (
-              // No revelada: mostrar interfaz de grabación
+              // No revelada: interfaz de grabación con paso de confirmación
               <>
-                {/* Estado idle — botón grabar */}
+                {/* ── IDLE: botón circular de micrófono ── */}
                 {estadoGrabacion === "idle" && !errorGrabacion && (
-                  <button
-                    onClick={iniciarGrabacion}
-                    className="w-full max-w-sm h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all mt-3 flex items-center justify-center gap-2"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                      <line x1="12" y1="19" x2="12" y2="23"/>
-                      <line x1="8" y1="23" x2="16" y2="23"/>
-                    </svg>
-                    Grabar mi respuesta
-                  </button>
+                  <div className="w-full max-w-sm flex flex-col items-center gap-4 mt-2">
+                    <p className="text-sm text-body text-center leading-snug">
+                      Pulsa el botón, di la frase en inglés<br />y pulsa de nuevo para terminar
+                    </p>
+                    <button
+                      onClick={iniciarGrabacion}
+                      className="w-[72px] h-[72px] rounded-full bg-brand-500 text-white flex items-center justify-center shadow-[0_4px_16px_rgba(255,122,69,0.35)] hover:brightness-95 active:scale-95 transition-all select-none"
+                      aria-label="Grabar respuesta"
+                    >
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                      </svg>
+                    </button>
+                    <span className="text-[11px] font-semibold text-mute uppercase tracking-widest">
+                      Pulsa para grabar
+                    </span>
+                  </div>
                 )}
 
-                {/* Estado grabando */}
+                {/* ── GRABANDO: botón rojo pulsando ── */}
                 {estadoGrabacion === "grabando" && (
-                  <div className="w-full max-w-sm flex flex-col items-center gap-3 mt-3">
+                  <div className="w-full max-w-sm flex flex-col items-center gap-4 mt-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-danger animate-pulse" />
-                      <span className="text-sm font-semibold text-body">Escuchando...</span>
+                      <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
+                      <span className="text-sm font-semibold text-danger">Grabando…</span>
                     </div>
                     <button
                       onClick={detenerReconocimiento}
-                      className="w-full h-12 rounded-md bg-white border border-brand-100 text-body text-sm font-semibold hover:border-brand-300 transition-all"
+                      className="w-[72px] h-[72px] rounded-full bg-danger text-white flex items-center justify-center shadow-[0_4px_16px_rgba(199,62,42,0.35)] animate-pulse active:scale-95 transition-all select-none"
+                      aria-label="Terminar grabación"
                     >
-                      Terminar
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                      </svg>
+                    </button>
+                    <span className="text-[11px] font-semibold text-danger uppercase tracking-widest">
+                      Pulsa para terminar
+                    </span>
+                  </div>
+                )}
+
+                {/* ── CONFIRMANDO: transcripción editable + Evaluar ── */}
+                {estadoGrabacion === "confirmando" && transcripcionUsuario !== null && (
+                  <div className="w-full max-w-sm flex flex-col gap-3 mt-2">
+                    {/* Zona de transcripción */}
+                    <div className="rounded-xl border border-surface bg-[#FAFAF8] px-4 py-3 flex flex-col gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-mute">
+                        Dijiste
+                      </span>
+                      <textarea
+                        value={transcripcionUsuario}
+                        onChange={(e) => setTranscripcionUsuario(e.target.value)}
+                        className="w-full text-[18px] font-medium italic text-ink bg-transparent outline-none resize-none leading-snug border-b border-brand-500 pb-1 focus:border-brand-500"
+                        rows={2}
+                        spellCheck={false}
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-mute">✏ Toca para corregir</span>
+                        <button
+                          onClick={() => {
+                            setEstadoGrabacion("idle");
+                            setTranscripcionUsuario(null);
+                          }}
+                          className="text-[11px] font-medium text-body bg-surface rounded-full px-3 py-1 hover:bg-brand-50 transition-colors"
+                        >
+                          ↺ Repetir
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Botón Evaluar */}
+                    <button
+                      onClick={evaluarTranscripcion}
+                      disabled={!transcripcionUsuario.trim()}
+                      className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                      </svg>
+                      Evaluar
                     </button>
                   </div>
                 )}
 
-                {/* Estado procesando */}
+                {/* ── PROCESANDO: spinner ── */}
                 {estadoGrabacion === "procesando" && (
                   <div className="w-full max-w-sm flex flex-col items-center gap-2 mt-6">
                     <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -881,13 +949,12 @@ export default function SesionInterna({ tutorActivo }: Props) {
                   </div>
                 )}
 
-                {/* Error: STT no escuchó nada, o un anillo de control bloqueó la IA */}
+                {/* ── ERROR: STT no escuchó nada, o un anillo de control bloqueó la IA ── */}
                 {estadoGrabacion === "idle" && errorGrabacion && (
                   <div className="w-full max-w-sm flex flex-col gap-3 mt-3">
                     <p className="text-sm text-body text-center">
                       {mensajeErrorIA ?? "No pude escucharte. ¿Volvemos a intentarlo?"}
                     </p>
-                    {/* Solo mostramos Reintentar si el error fue del STT (no de la IA) */}
                     {!mensajeErrorIA && (
                       <button
                         onClick={iniciarGrabacion}
