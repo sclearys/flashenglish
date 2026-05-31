@@ -26,6 +26,7 @@ import type {
   BloqueDetalle,
   DetalleUsuario,
   PerfilDetalle,
+  SesionHistorial,
 } from "./types";
 
 // ── Guard de seguridad ────────────────────────────────────────────────────────
@@ -74,7 +75,11 @@ function calcularFrasesAprendidas(perfil: Perfil): number {
   }, 0);
 }
 
-function construirDetallesPerfil(id: string, perfil: Perfil): PerfilDetalle {
+function construirDetallesPerfil(
+  id: string,
+  perfil: Perfil,
+  historialSesiones: SesionHistorial[] = []
+): PerfilDetalle {
   const TOTAL_CATALOGO = 750;
 
   // ── Bloques ────────────────────────────────────────────────────────────────
@@ -167,6 +172,7 @@ function construirDetallesPerfil(id: string, perfil: Perfil): PerfilDetalle {
     ultimaVezEntradas,
     punteroBloque,
     enRepasoBloque,
+    historialSesiones,
   };
 }
 
@@ -520,6 +526,23 @@ export async function setBloqueado(
   };
 }
 
+/**
+ * Elimina permanentemente una cuenta de Supabase Auth.
+ * Supabase cascadea el borrado a estado_usuario y evaluaciones_tutor
+ * por la FK con ON DELETE CASCADE definida en el schema.
+ */
+export async function eliminarCuenta(
+  userId: string
+): Promise<ResultadoAccion> {
+  if (!(await verificarAdmin())) return { ok: false, error: "No autorizado." };
+
+  const supabase = crearClienteAdmin();
+  const { error } = await supabase.auth.admin.deleteUser(userId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, mensaje: "Cuenta eliminada permanentemente." };
+}
+
 // ── Acciones públicas ─────────────────────────────────────────────────────────
 
 /**
@@ -555,8 +578,29 @@ export async function obtenerDetalleUsuario(
     user.email?.split("@")[0] ||
     "—";
 
+  // Historial de sesiones de bloque (Pieza H)
+  const { data: sesionesRows } = await supabase
+    .from("sesiones")
+    .select("id, perfil_id, creado_en, bloque, frases_total, frases_saltadas")
+    .eq("cuenta_id", userId)
+    .order("creado_en", { ascending: false })
+    .limit(200);
+
+  // Agrupar por perfil_id
+  const historialPorPerfil = new Map<string, SesionHistorial[]>();
+  for (const row of sesionesRows ?? []) {
+    if (!historialPorPerfil.has(row.perfil_id)) historialPorPerfil.set(row.perfil_id, []);
+    historialPorPerfil.get(row.perfil_id)!.push({
+      id: row.id,
+      creadoEn: row.creado_en,
+      bloque: row.bloque,
+      frasesTotal: row.frases_total,
+      frasesSaltadas: row.frases_saltadas,
+    });
+  }
+
   const perfiles: PerfilDetalle[] = Object.entries(appState.perfiles).map(
-    ([id, perfil]) => construirDetallesPerfil(id, perfil)
+    ([id, perfil]) => construirDetallesPerfil(id, perfil, historialPorPerfil.get(id) ?? [])
   );
 
   return {

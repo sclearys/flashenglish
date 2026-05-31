@@ -121,6 +121,20 @@ export function aplicarResultadoTest(estado: AppState, bloqueResultado: string):
   return nuevoEstado;
 }
 
+export function marcarTestCompletado(estado: AppState): AppState {
+  const perfil = obtenerPerfilActivo(estado);
+  const nuevoEstado = actualizarPerfilActivo(estado, { ...perfil, test_nivel_estado: "completado" });
+  guardarEstado(nuevoEstado);
+  return nuevoEstado;
+}
+
+export function marcarTestOmitido(estado: AppState): AppState {
+  const perfil = obtenerPerfilActivo(estado);
+  const nuevoEstado = actualizarPerfilActivo(estado, { ...perfil, test_nivel_estado: "omitido" });
+  guardarEstado(nuevoEstado);
+  return nuevoEstado;
+}
+
 // ── Gestión de perfiles ───────────────────────────────────────────────────────
 
 export const COLORES_PERFIL = ["#FF7A45", "#7B5EA7", "#1ABC9C"] as const;

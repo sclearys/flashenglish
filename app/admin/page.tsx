@@ -16,7 +16,7 @@
 
 import { crearClienteAdmin } from "@/lib/supabase-admin";
 import AdminPanel from "./AdminPanel";
-import type { UsuarioResumen, PerfilResumen, ConsumoGlobal } from "./types";
+import type { UsuarioResumen, PerfilResumen, ConsumoGlobal, SesionHistorial, FraseContenido, UsageStats } from "./types";
 import type { AppState } from "@/lib/types";
 import catalogo from "@/data/content.json";
 import {
@@ -86,6 +86,33 @@ export default async function AdminPage() {
   }
   const totalEvalHoy = evaluacionesHoyRows?.length ?? 0;
 
+  // ── 3c. Leer historial de sesiones (Pieza H) ─────────────────────────────
+  const { data: sesionesRows } = await supabase
+    .from("sesiones")
+    .select("id, cuenta_id, perfil_id, creado_en, bloque, frases_total, frases_saltadas")
+    .order("creado_en", { ascending: false })
+    .limit(1000);
+
+  // Contar sesiones totales por cuenta
+  const sesionesPorCuenta = new Map<string, number>();
+  for (const row of sesionesRows ?? []) {
+    sesionesPorCuenta.set(row.cuenta_id, (sesionesPorCuenta.get(row.cuenta_id) ?? 0) + 1);
+  }
+
+  // Agrupar en Map<`cuentaId::perfilId`, SesionHistorial[]>
+  const historialPorPerfil = new Map<string, SesionHistorial[]>();
+  for (const row of sesionesRows ?? []) {
+    const key = `${row.cuenta_id}::${row.perfil_id}`;
+    if (!historialPorPerfil.has(key)) historialPorPerfil.set(key, []);
+    historialPorPerfil.get(key)!.push({
+      id: row.id,
+      creadoEn: row.creado_en,
+      bloque: row.bloque,
+      frasesTotal: row.frases_total,
+      frasesSaltadas: row.frases_saltadas,
+    });
+  }
+
   const consumoGlobal: ConsumoGlobal = {
     totalHoy: totalEvalHoy,
     costeEstimadoEurHoy: Math.round(totalEvalHoy * COSTE_ESTIMADO_EUR_POR_EVALUACION * 1000) / 1000,
@@ -119,7 +146,8 @@ export default async function AdminPage() {
         tutorActivo: estadoRow?.tutor_activo ?? true,
         bloqueado: estadoRow?.bloqueado ?? false,
         evaluacionesHoy: evalHoyPorUsuario.get(user.id) ?? 0,
-      } satisfies UsuarioResumen;
+        sesionesTotal: sesionesPorCuenta.get(user.id) ?? 0,
+      } satisfies UsuarioResumen;  // perfiles vacíos → historialSesiones también vacío por defecto
     }
 
     // Procesar cada perfil del AppState
@@ -133,6 +161,9 @@ export default async function AdminPage() {
             ? Math.min(100, Math.round((puntero / totalFrases) * 100))
             : 0;
 
+        const historialKey = `${user.id}::${id}`;
+        const historialSesiones = (historialPorPerfil.get(historialKey) ?? []).slice(0, 20);
+
         return {
           id,
           nombre: perfil.nombre,
@@ -142,6 +173,7 @@ export default async function AdminPage() {
           racha: perfil.racha_dias,
           sesionEnCurso: !!perfil.sesion_en_curso,
           sesionInicio: perfil.sesion_en_curso?.inicio ?? null,
+          historialSesiones,
         } satisfies PerfilResumen;
       }
     );
@@ -159,8 +191,37 @@ export default async function AdminPage() {
       tutorActivo: estadoRow?.tutor_activo ?? true,
       bloqueado: estadoRow?.bloqueado ?? false,
       evaluacionesHoy: evalHoyPorUsuario.get(user.id) ?? 0,
+      sesionesTotal: sesionesPorCuenta.get(user.id) ?? 0,
     } satisfies UsuarioResumen;
   });
 
-  return <AdminPanel usuarios={usuariosResumen} consumoGlobal={consumoGlobal} />;
+  const frases = catalogo.frases as FraseContenido[];
+
+  // ── Agregar progreso_frases de todos los perfiles ────────────────────────
+  // Solo incluye frases en repaso activo (las dominadas se eliminan del record).
+  const usagePorFrase: Record<string, UsageStats> = {};
+  for (const estadoRow of estados ?? []) {
+    const appState = estadoRow.estado as AppState | undefined;
+    if (!appState?.perfiles) continue;
+    for (const [, perfil] of Object.entries(appState.perfiles)) {
+      for (const [fraseId, prog] of Object.entries(perfil.progreso_frases ?? {})) {
+        const p = prog as { estado: "casi" | "incorrecto"; pendientes: number };
+        if (!usagePorFrase[fraseId]) {
+          usagePorFrase[fraseId] = { enRepaso: 0, casi: 0, fallo: 0, perfilDetalle: [] };
+        }
+        const u = usagePorFrase[fraseId];
+        u.enRepaso++;
+        if (p.estado === "casi") u.casi++;
+        else if (p.estado === "incorrecto") u.fallo++;
+        u.perfilDetalle.push({
+          nombre: perfil.nombre,
+          estado: p.estado,
+          pendientes: p.pendientes,
+          color: perfil.color_acento,
+        });
+      }
+    }
+  }
+
+  return <AdminPanel usuarios={usuariosResumen} consumoGlobal={consumoGlobal} frases={frases} usagePorFrase={usagePorFrase} />;
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { cargarEstado, aplicarResultadoTest } from "@/lib/storage";
+import { cargarEstado, aplicarResultadoTest, marcarTestCompletado } from "@/lib/storage";
 import { BLOQUES_ORDENADOS } from "@/lib/catalogo";
 import {
   EstadoTest,
@@ -16,6 +16,7 @@ import {
   FraseTest,
 } from "@/lib/testNivel";
 import { AppState } from "@/lib/types";
+import { leerFraseEnIngles, detenerAudio, tieneWebSpeech } from "@/lib/audio";
 
 type PantallaUI = "inicio" | "test" | "resultado";
 
@@ -27,10 +28,21 @@ export default function TestNivelInterno() {
   const [resultado, setResultado] = useState<ResultadoTest | null>(null);
   const [fraseActual, setFraseActual] = useState<FraseTest | null>(null);
   const [indiceFraseActual, setIndiceFraseActual] = useState(0);
+  const [mostrandoRespuesta, setMostrandoRespuesta] = useState(false);
 
   useEffect(() => {
     setAppState(cargarEstado());
   }, []);
+
+  // Reproduce TTS automáticamente al revelar la respuesta
+  useEffect(() => {
+    if (mostrandoRespuesta && fraseActual) {
+      leerFraseEnIngles(fraseActual.en);
+    }
+    return () => {
+      if (mostrandoRespuesta) detenerAudio();
+    };
+  }, [mostrandoRespuesta, fraseActual]);
 
   if (!appState) {
     return (
@@ -43,7 +55,8 @@ export default function TestNivelInterno() {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function empezarDesdeElPrincipio() {
-    aplicarResultadoTest(appState!, "BASIC1");
+    const nuevoEstado = aplicarResultadoTest(appState!, "BASIC1");
+    marcarTestCompletado(nuevoEstado);
     router.push("/");
   }
 
@@ -52,11 +65,19 @@ export default function TestNivelInterno() {
     setEstadoTest(estado);
     setIndiceFraseActual(0);
     setFraseActual(getFraseTest(estado.frasesActuales[0]));
+    setMostrandoRespuesta(false);
     setPantallaUI("test");
+  }
+
+  function verRespuesta() {
+    setMostrandoRespuesta(true);
   }
 
   function responder(sabe: boolean) {
     if (!estadoTest || !fraseActual) return;
+
+    detenerAudio();
+    setMostrandoRespuesta(false);
 
     const idActual = fraseActual.id;
     let nuevoEstado = registrarRespuesta(estadoTest, idActual, sabe);
@@ -181,7 +202,10 @@ export default function TestNivelInterno() {
           </div>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={() => {
+              marcarTestCompletado(appState!);
+              router.push("/");
+            }}
             className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
           >
             Empezar a entrenar
@@ -226,31 +250,68 @@ export default function TestNivelInterno() {
       </div>
 
       {/* Tarjeta */}
-      <div key={fraseActual.id} className="w-full flex flex-col items-center animate-slide-in">
-        <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-6">
-          <span className="text-eyebrow font-semibold uppercase text-mute">
-            ¿Lo sabes?
-          </span>
-          <p className="text-[18px] font-semibold text-body leading-snug">
-            {fraseActual.es}
-          </p>
-        </div>
+      {!mostrandoRespuesta ? (
+        /* Pantalla A — pregunta */
+        <div key={`${fraseActual.id}-pregunta`} className="w-full flex flex-col items-center animate-slide-in">
+          <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-2 mb-6">
+            <span className="text-eyebrow font-semibold uppercase text-mute">
+              ¿Lo sabes?
+            </span>
+            <p className="text-[18px] font-semibold text-body leading-snug">
+              {fraseActual.es}
+            </p>
+          </div>
 
-        <div className="w-full max-w-sm grid grid-cols-2 gap-[7px]">
-          <button
-            onClick={() => responder(false)}
-            className="h-12 rounded-md bg-white border border-danger text-danger text-sm font-semibold hover:brightness-95 transition-all"
-          >
-            No lo sé
-          </button>
-          <button
-            onClick={() => responder(true)}
-            className="h-12 rounded-md bg-success text-white text-sm font-semibold hover:brightness-95 transition-all"
-          >
-            Lo sé
-          </button>
+          <div className="w-full max-w-sm">
+            <button
+              onClick={verRespuesta}
+              className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
+            >
+              Ver respuesta
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Pantalla B — respuesta */
+        <div key={`${fraseActual.id}-respuesta`} className="w-full flex flex-col items-center animate-slide-in">
+          <div className="w-full max-w-sm bg-brand-50 rounded-lg px-[14px] py-[22px] min-h-[120px] flex flex-col gap-3 mb-6">
+            <p className="text-sm text-mute leading-snug">
+              {fraseActual.es}
+            </p>
+            <div className="flex items-start gap-2">
+              <p className="text-[18px] font-semibold text-body leading-snug flex-1">
+                {fraseActual.en}
+              </p>
+              {tieneWebSpeech() && (
+                <button
+                  onClick={() => leerFraseEnIngles(fraseActual.en)}
+                  className="mt-[2px] shrink-0 text-mute hover:text-brand-500 transition-colors"
+                  aria-label="Repetir audio"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="w-full max-w-sm grid grid-cols-2 gap-[7px]">
+            <button
+              onClick={() => responder(false)}
+              className="h-12 rounded-md bg-white border border-danger text-danger text-sm font-semibold hover:brightness-95 transition-all"
+            >
+              No lo sé
+            </button>
+            <button
+              onClick={() => responder(true)}
+              className="h-12 rounded-md bg-success text-white text-sm font-semibold hover:brightness-95 transition-all"
+            >
+              Lo sé
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

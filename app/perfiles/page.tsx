@@ -137,7 +137,8 @@ export default function Perfiles() {
     if (!nombreInput.trim()) return;
     const nuevoEstado = crearPerfil(estado!, nombreInput.trim(), colorSeleccionado);
     setEstado(nuevoEstado);
-    setModo("selector");
+    sessionStorage.setItem("perfilSeleccionado", "1");
+    router.push("/test-nivel");
   }
 
   function guardarEdicion() {

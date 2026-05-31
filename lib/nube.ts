@@ -18,6 +18,8 @@
 import { crearClienteSupabase } from "./supabase";
 import type { AppState } from "./types";
 
+const TABLA_SESIONES = "sesiones";
+
 const TABLA = "estado_usuario";
 
 /**
@@ -82,5 +84,33 @@ export async function subirEstado(estado: AppState): Promise<void> {
       );
   } catch {
     // Fire-and-forget: ignoramos errores de red silenciosamente
+  }
+}
+
+/**
+ * Registra una sesión de bloque completada en la tabla `sesiones`.
+ * Diseñada para llamarse sin await (fire-and-forget).
+ * No-op si no hay sesión activa (modo invitado).
+ */
+export async function registrarSesionCompletada(
+  perfilId: string,
+  bloque: string,
+  frasesTotal: number,
+  frasesSaltadas: number
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const supabase = crearClienteSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from(TABLA_SESIONES).insert({
+      cuenta_id: user.id,
+      perfil_id: perfilId,
+      bloque,
+      frases_total: frasesTotal,
+      frases_saltadas: frasesSaltadas,
+    });
+  } catch {
+    // fire-and-forget: ignorar errores de red
   }
 }

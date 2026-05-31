@@ -22,6 +22,7 @@ import {
   detenerReconocimiento,
 } from "@/lib/reconocimiento";
 import { evaluarConTutor } from "./actions";
+import { registrarSesionCompletada } from "@/lib/nube";
 import { track } from "@vercel/analytics";
 
 // "seleccion-modo" es la nueva pantalla inicial en sesiones nuevas (Pieza G).
@@ -270,6 +271,14 @@ export default function SesionInterna({ tutorActivo }: Props) {
       };
       const estadoTerminado = actualizarPerfilActivo(estadoFinal, perfilTerminado);
       guardarEstado(estadoTerminado);
+
+      // Pieza H: registrar sesión en Supabase para auditoría del trenzado (fire-and-forget)
+      registrarSesionCompletada(
+        estadoFinal.perfil_activo,
+        bloqueCompletado,
+        sesionFinal.frases_ids.length,
+        sesionFinal.frases_saltadas ?? 0
+      );
 
       const perfilFinal = obtenerPerfilActivo(estadoTerminado);
       const nuevasPerfectas = sesionFinal.respuestas.filter(

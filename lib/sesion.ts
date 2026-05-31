@@ -28,13 +28,20 @@ export function construirSesion(
     )
     .map(([id]) => id);
 
-  const idsNuevas = obtenerFrasesNuevas(perfil, tamanyoSesion - idsEnRepaso.length);
+  const bloque = perfil.bloque_activo;
+  const { frases: idsNuevas, frasesSaltadas } = obtenerFrasesNuevasTrenzadas(
+    perfil,
+    bloque,
+    3,
+    tamanyoSesion - idsEnRepaso.length
+  );
 
   return {
     frases_ids: [...idsEnRepaso, ...idsNuevas],
     ids_repaso: idsEnRepaso,
     indice_actual: 0,
     respuestas: [],
+    frases_saltadas: frasesSaltadas,
   };
 }
 
@@ -83,24 +90,64 @@ export function construirSesionRefuerzo(
 }
 
 /**
- * Devuelve hasta `cantidad` IDs de frases nuevas del bloque activo,
- * respetando el puntero y saltando las que ya están en progreso_frases.
+ * Devuelve hasta `cantidad` IDs de frases nuevas, mezclando las próximas
+ * `nLecciones` lecciones con frases disponibles (Pieza H — trenzado).
+ *
+ * Algoritmo:
+ *   1. Identifica las N primeras lecciones distintas con frases disponibles
+ *      a partir del puntero actual.
+ *   2. Recoge todas las frases disponibles de esas lecciones (pool).
+ *   3. Baraja el pool (Fisher-Yates).
+ *   4. Devuelve los primeros `cantidad` IDs del pool barajado.
+ *
+ * Con nLecciones=1 se comporta como antes pero con orden aleatorio dentro
+ * de la lección. Si hay menos de nLecciones disponibles, usa las que haya.
  */
-function obtenerFrasesNuevas(perfil: Perfil, cantidad: number): string[] {
-  if (cantidad <= 0) return [];
+function obtenerFrasesNuevasTrenzadas(
+  perfil: Perfil,
+  bloque: string,
+  nLecciones: number,
+  cantidad: number
+): { frases: string[]; frasesSaltadas: number } {
+  if (cantidad <= 0) return { frases: [], frasesSaltadas: 0 };
 
-  const bloque = perfil.bloque_activo;
   const frases = frasesDelBloque(bloque);
   const puntero = perfil.puntero_frase_nueva[bloque] ?? 0;
-  const resultado: string[] = [];
+
+  // Identificar las próximas lecciones con frases disponibles
+  const leccionesVistas = new Set<string>();
+  const leccionesActivas: string[] = [];
 
   for (let i = puntero; i < frases.length; i++) {
-    if (resultado.length >= cantidad) break;
     const frase = frases[i];
-    if (!(frase.id in perfil.progreso_frases)) {
-      resultado.push(frase.id);
+    if (frase.id in perfil.progreso_frases) continue;
+    if (!leccionesVistas.has(frase.leccion)) {
+      leccionesVistas.add(frase.leccion);
+      leccionesActivas.push(frase.leccion);
+      if (leccionesActivas.length >= nLecciones) break;
     }
   }
 
-  return resultado;
+  if (leccionesActivas.length === 0) return { frases: [], frasesSaltadas: 0 };
+
+  // Recoger todas las frases disponibles de esas lecciones
+  const leccionesSet = new Set(leccionesActivas);
+  const pool: string[] = [];
+
+  for (let i = puntero; i < frases.length; i++) {
+    const frase = frases[i];
+    if (frase.id in perfil.progreso_frases) continue;
+    if (leccionesSet.has(frase.leccion)) {
+      pool.push(frase.id);
+    }
+  }
+
+  // Barajar (Fisher-Yates)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  const seleccionadas = pool.slice(0, cantidad);
+  return { frases: seleccionadas, frasesSaltadas: pool.length - seleccionadas.length };
 }

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import type { UsuarioResumen, PerfilResumen, DetalleUsuario, PerfilDetalle, ConsumoGlobal } from "./types";
+import { useRouter } from "next/navigation";
+import type { UsuarioResumen, PerfilResumen, DetalleUsuario, PerfilDetalle, ConsumoGlobal, SesionHistorial, FraseContenido, UsageStats } from "./types";
+import PanelSalud from "./contenido/PanelSalud";
+import ExplorarFrases from "./contenido/ExplorarFrases";
+import MapaMaestro from "./contenido/MapaMaestro";
+import AnadirFrase from "./contenido/AnadirFrase";
 import {
   obtenerDetalleUsuario,
   borrarSesionEnCurso,
@@ -12,6 +17,7 @@ import {
   avanzarBloque,
   setTutorActivo,
   setBloqueado,
+  eliminarCuenta,
 } from "./actions";
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
@@ -33,6 +39,8 @@ type ModalConfig = {
   confirmLabel: string;
   esPeligroso: boolean;
   inputInicial?: number;             // si está definido, muestra input numérico
+  confirmarTexto?: string;           // si está definido, el botón exige escribir este texto exacto
+  refreshTrasConfirmar?: boolean;    // si true, hace router.refresh() en vez de recargar el detalle
   onConfirm: (inputVal?: number) => Promise<void>;
 };
 
@@ -95,9 +103,14 @@ function getTopicColor(pct: number) {
 
 function Modal({ config, onCerrar }: { config: ModalConfig; onCerrar: () => void }) {
   const [inputVal, setInputVal] = useState(config.inputInicial ?? 0);
+  const [textoConfirm, setTextoConfirm] = useState("");
   const [ejecutando, setEjecutando] = useState(false);
 
+  const confirmDeshabilitado = ejecutando ||
+    (config.confirmarTexto !== undefined && textoConfirm !== config.confirmarTexto);
+
   async function handleConfirm() {
+    if (confirmDeshabilitado) return;
     setEjecutando(true);
     try {
       await config.onConfirm(config.inputInicial !== undefined ? inputVal : undefined);
@@ -147,6 +160,25 @@ function Modal({ config, onCerrar }: { config: ModalConfig; onCerrar: () => void
           </div>
         )}
 
+        {config.confirmarTexto !== undefined && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 13, color: C.mute, marginBottom: 6 }}>
+              Escribe el email de la cuenta para confirmar:
+            </div>
+            <input
+              type="email"
+              placeholder={config.confirmarTexto}
+              value={textoConfirm}
+              onChange={(e) => setTextoConfirm(e.target.value)}
+              style={{
+                width: "100%", fontSize: 13, padding: "9px 12px",
+                border: `1.5px solid ${textoConfirm === config.confirmarTexto ? C.red : C.line}`,
+                borderRadius: 8, fontFamily: "inherit", color: C.ink, outline: "none",
+              }}
+            />
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
           <button
             onClick={onCerrar} disabled={ejecutando}
@@ -159,13 +191,14 @@ function Modal({ config, onCerrar }: { config: ModalConfig; onCerrar: () => void
             Cancelar
           </button>
           <button
-            onClick={handleConfirm} disabled={ejecutando}
+            onClick={handleConfirm} disabled={confirmDeshabilitado}
             style={{
               padding: "10px 20px", borderRadius: 8, fontSize: 14, fontWeight: 700,
-              cursor: ejecutando ? "default" : "pointer",
+              cursor: confirmDeshabilitado ? "default" : "pointer",
               fontFamily: "inherit", border: "none",
               background: config.esPeligroso ? C.red : C.orange,
-              color: "#fff", opacity: ejecutando ? 0.7 : 1,
+              color: "#fff", opacity: confirmDeshabilitado ? 0.4 : 1,
+              transition: "opacity .15s",
             }}
           >
             {ejecutando ? "Aplicando…" : config.confirmLabel}
@@ -262,6 +295,9 @@ function FilaUsuario({
             <span style={{ fontSize: 12, fontWeight: 700, color: C.mute }}>{perfilActivo.progresoBloque}%</span>
           </div>
         ) : <span style={{ color: C.mute2 }}>—</span>}
+      </td>
+      <td style={td}>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>{usuario.sesionesTotal > 0 ? usuario.sesionesTotal : <span style={{ color: C.mute2 }}>—</span>}</span>
       </td>
       <td style={td}>
         {perfilActivo ? <span style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700 }}>🔥 {perfilActivo.racha}</span> : <span style={{ color: C.mute2 }}>—</span>}
@@ -598,6 +634,33 @@ function PanelDetalle({
         >
           {bloqueado ? "⛔ Bloqueado" : "Bloquear"}
         </button>
+
+        <div style={{ width: 1, height: 24, background: C.line, margin: "0 4px" }} />
+
+        {/* Eliminar cuenta */}
+        <button
+          onClick={() => onAction({
+            titulo: "Eliminar cuenta",
+            cuerpo: (
+              <span>
+                <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+                  <strong style={{ color: C.red }}>⚠️ Acción irreversible.</strong> Se eliminará permanentemente la cuenta de <strong>{detalle.nombreDisplay}</strong> ({detalle.email}) y todo su progreso. No hay vuelta atrás.
+                </div>
+              </span>
+            ),
+            confirmLabel: "Eliminar para siempre",
+            esPeligroso: true,
+            confirmarTexto: detalle.email,
+            refreshTrasConfirmar: true,
+            onConfirm: async () => {
+              const r = await eliminarCuenta(userId);
+              if (!r.ok) throw new Error(r.error);
+            },
+          })}
+          style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.red}`, background: C.redBg, color: C.red }}
+        >
+          Eliminar cuenta
+        </button>
       </div>
 
       {/* Pestañas de perfil */}
@@ -701,6 +764,34 @@ function PanelDetalle({
           </div>
 
         </div>
+
+        {/* Historial de sesiones (Pieza H) */}
+        {perfil.historialSesiones.length > 0 && (
+          <div style={{ ...card, margin: "0 24px 24px" }}>
+            <div style={cardTitle}>Historial de sesiones · trenzado</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 60px 70px", gap: "4px 12px", alignItems: "center" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.mute, textTransform: "uppercase" }}>Fecha</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.mute, textTransform: "uppercase" }}>Bloque</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.mute, textTransform: "uppercase", textAlign: "right" }}>Frases</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.mute, textTransform: "uppercase", textAlign: "right" }}>Saltadas</span>
+              {perfil.historialSesiones.slice(0, 10).map((s: SesionHistorial) => {
+                const diffMs = Date.now() - new Date(s.creadoEn).getTime();
+                const diffH = Math.floor(diffMs / 3600000);
+                const diffD = Math.floor(diffMs / 86400000);
+                const fechaTexto = diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : `${diffD}d`;
+                return (
+                  <>
+                    <span key={`f-${s.id}`} style={{ fontSize: 12, color: C.ink2 }}>hace {fechaTexto}</span>
+                    <span key={`b-${s.id}`} style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: C.mute }}>{s.bloque}</span>
+                    <span key={`t-${s.id}`} style={{ fontSize: 12, textAlign: "right" }}>{s.frasesTotal}</span>
+                    <span key={`s-${s.id}`} style={{ fontSize: 12, textAlign: "right", color: s.frasesSaltadas > 0 ? C.amber : C.mute2 }}>{s.frasesSaltadas}</span>
+                  </>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Acciones */}
@@ -712,9 +803,73 @@ function PanelDetalle({
 // ── Componente principal ──────────────────────────────────────────────────────
 
 type Tab = "usuarios" | "contenido" | "gramatica";
+type SubTabContenido = "salud" | "explorar" | "mapa" | "anadir";
 
-export default function AdminPanel({ usuarios, consumoGlobal }: { usuarios: UsuarioResumen[]; consumoGlobal: ConsumoGlobal }) {
+// ── Panel de Contenido ────────────────────────────────────────────────────────
+
+function PanelContenido({ frases, usagePorFrase }: { frases: FraseContenido[]; usagePorFrase: Record<string, UsageStats> }) {
+  const [subTab, setSubTab] = useState<SubTabContenido>("salud");
+
+  const bloques = Array.from(new Set(frases.map((f) => f.bloque)));
+  const lecciones = Array.from(new Set(frases.map((f) => f.leccion)));
+
+  const subTabs: { id: SubTabContenido; label: string }[] = [
+    { id: "salud",   label: "Panel de salud" },
+    { id: "explorar", label: "Explorar frases" },
+    { id: "mapa",    label: "Mapa Maestro" },
+    { id: "anadir",  label: "Añadir frase" },
+  ];
+
+  return (
+    <div>
+      {/* Sub-tabs */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 22, borderBottom: `1px solid ${C.line}` }}>
+        {subTabs.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setSubTab(s.id)}
+            style={{
+              padding: "10px 20px", fontSize: 13, fontWeight: 600,
+              color: subTab === s.id ? C.orange : C.mute,
+              background: "none", border: "none",
+              borderBottom: subTab === s.id ? `2px solid ${C.orange}` : "2px solid transparent",
+              cursor: "pointer", fontFamily: "inherit",
+              marginBottom: -1, transition: "all .15s",
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Banner de datos */}
+      <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, padding: "9px 14px", fontSize: 13, color: "#2563EB", marginBottom: 20, display: "flex", gap: 8 }}>
+        ℹ️ <span>Catálogo cargado: <strong>{frases.length} frases</strong> en <strong>{bloques.length} bloques</strong> y <strong>{lecciones.length} lecciones</strong>. Datos de uso por perfil: disponibles en Iteración 4.</span>
+      </div>
+
+      {/* Contenido por sub-tab */}
+      {subTab === "salud" && <PanelSalud frases={frases} usagePorFrase={usagePorFrase} />}
+      {subTab === "explorar" && <ExplorarFrases frases={frases} usagePorFrase={usagePorFrase} />}
+      {subTab === "mapa" && <MapaMaestro frases={frases} />}
+      {subTab === "anadir" && <AnadirFrase frases={frases} />}
+    </div>
+  );
+}
+
+function PlaceholderSubTab({ icono, titulo, desc }: { icono: string; titulo: string; desc: string }) {
+  return (
+    <div style={{ textAlign: "center", padding: "60px 24px", color: C.mute }}>
+      <div style={{ fontSize: 36, marginBottom: 14 }}>{icono}</div>
+      <p style={{ fontWeight: 700, fontSize: 17, color: C.ink, marginBottom: 8 }}>{titulo}</p>
+      <p style={{ fontSize: 14, maxWidth: 400, margin: "0 auto" }}>{desc}</p>
+    </div>
+  );
+}
+
+export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFrase }: { usuarios: UsuarioResumen[]; consumoGlobal: ConsumoGlobal; frases: FraseContenido[]; usagePorFrase: Record<string, UsageStats> }) {
+  const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
+  const [filtroBloque, setFiltroBloque] = useState("");
   const [tabActiva, setTabActiva] = useState<Tab>("usuarios");
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<DetalleUsuario | null>(null);
@@ -730,13 +885,16 @@ export default function AdminPanel({ usuarios, consumoGlobal }: { usuarios: Usua
 
   const usuariosFiltrados = useMemo(() => {
     const q = busqueda.toLowerCase().trim();
-    if (!q) return usuarios;
-    return usuarios.filter((u) =>
-      u.email.toLowerCase().includes(q) ||
-      u.nombreDisplay.toLowerCase().includes(q) ||
-      u.perfiles.some((p) => p.nombre.toLowerCase().includes(q))
-    );
-  }, [usuarios, busqueda]);
+    return usuarios.filter((u) => {
+      const matchTexto = !q ||
+        u.email.toLowerCase().includes(q) ||
+        u.nombreDisplay.toLowerCase().includes(q) ||
+        u.perfiles.some((p) => p.nombre.toLowerCase().includes(q));
+      const matchBloque = !filtroBloque ||
+        u.perfiles.some((p) => p.bloqueActivo === filtroBloque);
+      return matchTexto && matchBloque;
+    });
+  }, [usuarios, busqueda, filtroBloque]);
 
   function mostrarToast(msg: string, tipo: "ok" | "warn" = "ok") {
     setToast({ msg, tipo });
@@ -766,11 +924,19 @@ export default function AdminPanel({ usuarios, consumoGlobal }: { usuarios: Usua
   }
 
   function abrirModal(config: ModalConfig) {
-    // Envolvemos onConfirm para añadir toast + recarga automática
     const onConfirmConExtra = async (val?: number) => {
       await config.onConfirm(val);
-      mostrarToast("Acción aplicada correctamente.");
-      if (seleccionadoId) await recargarDetalle(seleccionadoId);
+      mostrarToast(
+        config.refreshTrasConfirmar ? "Cuenta eliminada." : "Acción aplicada correctamente.",
+        config.refreshTrasConfirmar ? "warn" : "ok"
+      );
+      if (config.refreshTrasConfirmar) {
+        setSeleccionadoId(null);
+        setDetalle(null);
+        router.refresh();
+      } else if (seleccionadoId) {
+        await recargarDetalle(seleccionadoId);
+      }
     };
     setModalConfig({ ...config, onConfirm: onConfirmConExtra });
   }
@@ -820,14 +986,20 @@ export default function AdminPanel({ usuarios, consumoGlobal }: { usuarios: Usua
             <div style={{ background: "#fff", border: `1px solid ${C.line}`, borderRadius: 14, boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04)", overflow: "hidden" }}>
               <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.surface}`, display: "flex", gap: 10, alignItems: "center" }}>
                 <input type="text" placeholder="Buscar por email o nombre de perfil…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ flex: 1, maxWidth: 320, fontSize: 13, padding: "8px 12px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", outline: "none" }} />
+                <select value={filtroBloque} onChange={(e) => setFiltroBloque(e.target.value)} style={{ fontSize: 13, padding: "8px 12px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", cursor: "pointer" }}>
+                  <option value="">Todos los bloques</option>
+                  {["BASIC1","BASIC2","INT1","INT2","INT3","INT4","ADV1","ADV2"].map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
                 <span style={{ marginLeft: "auto", fontSize: 12, color: C.mute, background: C.surface, padding: "4px 10px", borderRadius: 20, fontWeight: 600 }}>
-                  {usuariosFiltrados.length} {usuariosFiltrados.length !== 1 ? "cuentas" : "cuenta"}{busqueda && ` de ${totalCuentas}`}
+                  {usuariosFiltrados.length} {usuariosFiltrados.length !== 1 ? "cuentas" : "cuenta"}{(busqueda || filtroBloque) && ` de ${totalCuentas}`}
                 </span>
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    {["Usuario", "Perfiles", "Bloque activo", "Progreso", "Racha", "Última sesión", "Estado", ""].map((h, i) => (
+                    {["Usuario", "Perfiles", "Bloque activo", "Progreso", "Sesiones", "Racha", "Última sesión", "Estado", ""].map((h, i) => (
                       <th key={i} style={{ textAlign: "left", fontSize: 11, fontWeight: 700, color: C.mute, padding: "10px 16px", background: C.surface, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${C.line}` }}>{h}</th>
                     ))}
                   </tr>
@@ -867,13 +1039,13 @@ export default function AdminPanel({ usuarios, consumoGlobal }: { usuarios: Usua
           </>
         )}
 
-        {tabActiva !== "usuarios" && (
+        {tabActiva === "contenido" && <PanelContenido frases={frases} usagePorFrase={usagePorFrase} />}
+
+        {tabActiva === "gramatica" && (
           <div style={{ textAlign: "center", padding: "80px 24px", color: C.mute }}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>{tabActiva === "contenido" ? "📄" : "📚"}</div>
-            <p style={{ fontWeight: 700, fontSize: 18, color: C.ink, marginBottom: 8 }}>
-              {tabActiva === "contenido" ? "Gestión de contenido" : "Tips gramaticales"}
-            </p>
-            <p style={{ fontSize: 14 }}>Este panel estará disponible en la versión final.</p>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>📚</div>
+            <p style={{ fontWeight: 700, fontSize: 18, color: C.ink, marginBottom: 8 }}>Tips gramaticales</p>
+            <p style={{ fontSize: 14 }}>Este panel estará disponible en una versión futura.</p>
           </div>
         )}
       </main>

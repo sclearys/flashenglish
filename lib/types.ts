@@ -60,6 +60,9 @@ export interface SesionEnCurso {
   // Pieza G: modo de evaluación elegido al inicio de la sesión.
   // Ausencia = autoevaluacion (retrocompatible con sesiones antiguas).
   modo?: "tutor" | "autoevaluacion";
+  // Pieza H: frases del pool trenzado que no cupieron en esta sesión.
+  // undefined en sesiones antiguas o de refuerzo (retrocompatible).
+  frases_saltadas?: number;
 }
 
 // ── Perfil ────────────────────────────────────────────────────────────────
@@ -87,6 +90,7 @@ export interface Perfil {
   puntero_frase_nueva: PunteroBloque;
   progreso_frases: Record<string, ProgresoFrase>;
   sesion_en_curso: SesionEnCurso | null;
+  test_nivel_estado?: "completado" | "omitido" | null;
 }
 
 // ── Estado global de la app ───────────────────────────────────────────────

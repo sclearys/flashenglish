@@ -107,9 +107,11 @@ export function detenerReconocimiento(): void {
   if (reconocedorActivo) {
     try {
       reconocedorActivo.stop();
+      // No limpiamos reconocedorActivo aquí: en iOS .stop() es asíncrono
+      // y onresult puede llegar después. Es onend quien lo pone a null.
     } catch {
-      // Ignorar errores al detener (puede que ya haya parado solo).
+      // Si .stop() lanza, el reconocedor no disparará onend → limpiamos aquí.
+      reconocedorActivo = null;
     }
-    reconocedorActivo = null;
   }
 }

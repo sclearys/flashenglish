@@ -139,7 +139,12 @@ export function calcularSiguienteFase(estado: EstadoTest): EstadoTest {
   else zonaProbable = ["BASIC2", "INT1"];
 
   const [inferior, superior] = zonaProbable;
-  const frasesInferior = [...ANCLAS_TEST[inferior]];
+  // Cuando la zona es INT2+INT3, las 3 frases ancla de INT2 ya se respondieron en Fase 1.
+  // Solo añadimos la 4ª frase de INT2 para completar el cuarteto sin repetir.
+  const frasesInferior =
+    inferior === "INT2"
+      ? ["INT2-L06-09-V1"]
+      : [...ANCLAS_TEST[inferior]];
   const frasesSuperior = [...ANCLAS_TEST[superior]];
 
   return {

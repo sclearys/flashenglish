@@ -7,6 +7,15 @@
  * server → client (solo strings, numbers y booleans).
  */
 
+// Pieza H: entrada del historial de sesiones de bloque completadas.
+export type SesionHistorial = {
+  id: string;
+  creadoEn: string;       // ISO timestamp
+  bloque: string;
+  frasesTotal: number;
+  frasesSaltadas: number;
+};
+
 export type PerfilResumen = {
   id: string;           // "perfil_1" | "perfil_2" | "perfil_3"
   nombre: string;
@@ -16,6 +25,7 @@ export type PerfilResumen = {
   racha: number;          // racha_dias del perfil
   sesionEnCurso: boolean;
   sesionInicio: string | null; // ISO timestamp si existe campo inicio (Pieza F+)
+  historialSesiones: SesionHistorial[]; // últimas sesiones de bloque (Pieza H)
 };
 
 export type UsuarioResumen = {
@@ -32,6 +42,7 @@ export type UsuarioResumen = {
   tutorActivo: boolean;             // admin puede desactivar el tutor para este usuario
   bloqueado: boolean;               // cuenta bloqueada
   evaluacionesHoy: number;          // evaluaciones IA hechas hoy
+  sesionesTotal: number;            // sesiones de bloque completadas (tabla sesiones)
 };
 
 // Datos globales de consumo del tutor virtual (para la cabecera del panel de admin).
@@ -80,6 +91,8 @@ export type PerfilDetalle = {
   // Para las acciones de bloque (It-5)
   punteroBloque: number;            // puntero_frase_nueva del bloque activo
   enRepasoBloque: number;           // entradas de progreso_frases del bloque activo
+  // Pieza H: historial de sesiones de bloque completadas
+  historialSesiones: SesionHistorial[];
 };
 
 export type DetalleUsuario = {
@@ -88,4 +101,35 @@ export type DetalleUsuario = {
   nombreDisplay: string;
   perfiles: PerfilDetalle[];
   perfilActivoId: string;
+};
+
+// ── Tipos del panel de Contenido ─────────────────────────────────────────────
+
+// Estadísticas de uso por frase, agregadas de todos los perfiles.
+// Solo refleja frases en repaso activo (progreso_frases).
+// Frases dominadas (ciclo completado) se eliminan de progreso_frases → no aparecen aquí.
+export type UsageStats = {
+  enRepaso: number;    // perfiles con esta frase en repaso activo
+  casi: number;        // perfiles con estado "casi" (último eval fue casi)
+  fallo: number;       // perfiles con estado "incorrecto" (último eval fue fallo)
+  perfilDetalle: Array<{
+    nombre: string;
+    estado: "casi" | "incorrecto";
+    pendientes: number;
+    color: string;
+  }>;
+};
+
+
+
+// Frase del catálogo. Estructura del content.json actual (v10 parcial):
+// falta uso, tema_prot, registro, subtema, problema — se añadirán con el Excel v10 completo.
+export type FraseContenido = {
+  id: string;
+  bloque: string;
+  leccion: string;
+  orden: number;
+  es: string;
+  en: string;
+  temas_gramaticales: string[];
 };
