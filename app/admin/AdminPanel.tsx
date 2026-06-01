@@ -879,6 +879,9 @@ export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFr
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
   const [filtroBloque, setFiltroBloque] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [sortCol, setSortCol] = useState<string>("ultimaActividad");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [tabActiva, setTabActiva] = useState<Tab>("usuarios");
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<DetalleUsuario | null>(null);
@@ -895,15 +898,45 @@ export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFr
   const usuariosFiltrados = useMemo(() => {
     const q = busqueda.toLowerCase().trim();
     return usuarios.filter((u) => {
+      // Texto libre: email, nombre display o nombre de perfil
       const matchTexto = !q ||
         u.email.toLowerCase().includes(q) ||
         u.nombreDisplay.toLowerCase().includes(q) ||
         u.perfiles.some((p) => p.nombre.toLowerCase().includes(q));
+
+      // Bloque activo de cualquier perfil del usuario
       const matchBloque = !filtroBloque ||
         u.perfiles.some((p) => p.bloqueActivo === filtroBloque);
-      return matchTexto && matchBloque;
+
+      // Estado derivado del usuario
+      let matchEstado = true;
+      if (filtroEstado === "hoy") matchEstado = u.diasDesdeUltima === 0;
+      else if (filtroEstado === "reciente") matchEstado = u.diasDesdeUltima > 0 && u.diasDesdeUltima <= 7;
+      else if (filtroEstado === "inactivo") matchEstado = u.diasDesdeUltima > 7;
+      else if (filtroEstado === "sesion") matchEstado = tieneSesionEnCurso(u.perfiles);
+      else if (filtroEstado === "atascado") matchEstado = tieneSesionAtascada(u.perfiles);
+      else if (filtroEstado === "bloqueado") matchEstado = u.bloqueado;
+
+      return matchTexto && matchBloque && matchEstado;
+    }).sort((a, b) => {
+      const perfilA = a.perfiles.find((p) => p.id === a.perfilActivoId) ?? a.perfiles[0];
+      const perfilB = b.perfiles.find((p) => p.id === b.perfilActivoId) ?? b.perfiles[0];
+      let diff = 0;
+      if (sortCol === "usuario")          diff = a.nombreDisplay.localeCompare(b.nombreDisplay);
+      else if (sortCol === "perfiles")    diff = a.perfiles.length - b.perfiles.length;
+      else if (sortCol === "bloque")      diff = (perfilA?.bloqueActivo ?? "").localeCompare(perfilB?.bloqueActivo ?? "");
+      else if (sortCol === "progreso")    diff = (perfilA?.progresoBloque ?? 0) - (perfilB?.progresoBloque ?? 0);
+      else if (sortCol === "racha")       diff = (perfilA?.racha ?? 0) - (perfilB?.racha ?? 0);
+      else if (sortCol === "ultimaActividad") diff = a.diasDesdeUltima - b.diasDesdeUltima;
+      else if (sortCol === "estado")      diff = a.diasDesdeUltima - b.diasDesdeUltima;
+      return sortDir === "asc" ? diff : -diff;
     });
-  }, [usuarios, busqueda, filtroBloque]);
+  }, [usuarios, busqueda, filtroBloque, filtroEstado, sortCol, sortDir]);
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  }
 
   function mostrarToast(msg: string, tipo: "ok" | "warn" = "ok") {
     setToast({ msg, tipo });
@@ -994,22 +1027,62 @@ export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFr
 
             <div style={{ background: "#fff", border: `1px solid ${C.line}`, borderRadius: 14, boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04)", overflow: "hidden" }}>
               <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.surface}`, display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="text" placeholder="Buscar por email o nombre de perfil…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ flex: 1, maxWidth: 320, fontSize: 13, padding: "8px 12px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", outline: "none" }} />
-                <select value={filtroBloque} onChange={(e) => setFiltroBloque(e.target.value)} style={{ fontSize: 13, padding: "8px 12px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", cursor: "pointer" }}>
+                <input type="text" placeholder="Buscar por email o nombre de perfil…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ flex: 1, maxWidth: 260, fontSize: 13, padding: "8px 12px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", outline: "none" }} />
+                <select value={filtroBloque} onChange={(e) => setFiltroBloque(e.target.value)} style={{ fontSize: 13, padding: "8px 11px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", cursor: "pointer" }}>
                   <option value="">Todos los bloques</option>
                   {["BASIC1","BASIC2","INT1","INT2","INT3","INT4","ADV1","ADV2"].map((b) => (
                     <option key={b} value={b}>{b}</option>
                   ))}
                 </select>
-                <span style={{ marginLeft: "auto", fontSize: 12, color: C.mute, background: C.surface, padding: "4px 10px", borderRadius: 20, fontWeight: 600 }}>
-                  {usuariosFiltrados.length} {usuariosFiltrados.length !== 1 ? "cuentas" : "cuenta"}{(busqueda || filtroBloque) && ` de ${totalCuentas}`}
+                <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} style={{ fontSize: 13, padding: "8px 11px", border: `1px solid ${C.line}`, borderRadius: 8, background: C.surface, color: C.ink, fontFamily: "inherit", cursor: "pointer" }}>
+                  <option value="">Todos los estados</option>
+                  <option value="hoy">Activo hoy</option>
+                  <option value="reciente">Reciente (≤7 días)</option>
+                  <option value="inactivo">Inactivo (&gt;7 días)</option>
+                  <option value="sesion">Sesión en curso</option>
+                  <option value="atascado">Sesión atascada</option>
+                  <option value="bloqueado">Bloqueado</option>
+                </select>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: C.mute, background: C.surface, padding: "4px 10px", borderRadius: 20, fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {usuariosFiltrados.length} {usuariosFiltrados.length !== 1 ? "cuentas" : "cuenta"}{(busqueda || filtroBloque || filtroEstado) && ` de ${totalCuentas}`}
                 </span>
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    {["Usuario", "Perfiles", "Bloque activo", "Progreso", "Sesiones", "Racha", "Última sesión", "Estado", ""].map((h, i) => (
-                      <th key={i} style={{ textAlign: "left", fontSize: 11, fontWeight: 700, color: C.mute, padding: "10px 16px", background: C.surface, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${C.line}` }}>{h}</th>
+                    {([
+                      { label: "Usuario",        col: "usuario" },
+                      { label: "Perfiles",       col: "perfiles" },
+                      { label: "Bloque activo",  col: "bloque" },
+                      { label: "Progreso",       col: "progreso" },
+                      { label: "Sesiones",       col: null },
+                      { label: "Racha",          col: "racha" },
+                      { label: "Última sesión",  col: "ultimaActividad" },
+                      { label: "Estado",         col: "estado" },
+                      { label: "",               col: null },
+                    ] as { label: string; col: string | null }[]).map(({ label, col }) => (
+                      <th
+                        key={label}
+                        onClick={col ? () => handleSort(col) : undefined}
+                        style={{
+                          textAlign: "left", fontSize: 11, fontWeight: 700,
+                          color: col && sortCol === col ? C.orange : C.mute,
+                          padding: "10px 16px", background: C.surface,
+                          textTransform: "uppercase", letterSpacing: "0.04em",
+                          borderBottom: `1px solid ${C.line}`,
+                          cursor: col ? "pointer" : "default",
+                          userSelect: "none",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {label}
+                        {col && sortCol === col && (
+                          <span style={{ marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>
+                        )}
+                        {col && sortCol !== col && label && (
+                          <span style={{ marginLeft: 4, opacity: 0.3 }}>↕</span>
+                        )}
+                      </th>
                     ))}
                   </tr>
                 </thead>
