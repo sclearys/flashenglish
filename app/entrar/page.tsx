@@ -103,7 +103,10 @@ export default function Entrar() {
 
         {/* Cabecera */}
         <div className="flex flex-col items-center gap-3 text-center">
-          <img src="/logo-app.svg" alt="FlashEnglish" className="w-14 h-14" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-14 h-14">
+            <circle cx="50" cy="50" r="50" fill="#FF7A45"/>
+            <rect x="52" y="52" width="36" height="36" rx="8" ry="8" fill="white"/>
+          </svg>
           <div className="flex flex-col gap-1">
             <h1 className="text-[22px] font-semibold text-ink">FlashEnglish</h1>
             <p className="text-sm text-body">Tu progreso, en todos tus dispositivos</p>
