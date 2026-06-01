@@ -11,14 +11,19 @@ export function tieneWebSpeech(): boolean {
 // Lee un texto en inglés con acento UK a velocidad ligeramente reducida.
 // Cancela cualquier reproducción en curso antes de empezar (evita solapamientos
 // y permite "reiniciar" si se llama mientras ya está sonando).
-export function leerFraseEnIngles(texto: string): void {
-  if (!tieneWebSpeech()) return;
+// onEnd: callback opcional que se llama cuando el audio termina de reproducirse.
+export function leerFraseEnIngles(texto: string, onEnd?: () => void): void {
+  if (!tieneWebSpeech()) {
+    onEnd?.();
+    return;
+  }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(texto);
   utterance.lang = "en-GB";
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
+  if (onEnd) utterance.onend = onEnd;
   window.speechSynthesis.speak(utterance);
 }
 
