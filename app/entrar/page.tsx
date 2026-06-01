@@ -103,12 +103,7 @@ export default function Entrar() {
 
         {/* Cabecera */}
         <div className="flex flex-col items-center gap-3 text-center">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl font-bold"
-            style={{ background: "#FF7A45" }}
-          >
-            F
-          </div>
+          <img src="/logo-app.png" alt="FlashEnglish" className="w-14 h-14" />
           <div className="flex flex-col gap-1">
             <h1 className="text-[22px] font-semibold text-ink">FlashEnglish</h1>
             <p className="text-sm text-body">Tu progreso, en todos tus dispositivos</p>
