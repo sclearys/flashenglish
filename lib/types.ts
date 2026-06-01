@@ -91,6 +91,7 @@ export interface Perfil {
   progreso_frases: Record<string, ProgresoFrase>;
   sesion_en_curso: SesionEnCurso | null;
   test_nivel_estado?: "completado" | "omitido" | null;
+  test_nivel_fecha?: string | null;   // ISO timestamp de cuándo se completó/omitió el test
 }
 
 // ── Estado global de la app ───────────────────────────────────────────────

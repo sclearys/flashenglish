@@ -93,6 +93,9 @@ export type PerfilDetalle = {
   enRepasoBloque: number;           // entradas de progreso_frases del bloque activo
   // Pieza H: historial de sesiones de bloque completadas
   historialSesiones: SesionHistorial[];
+  // Pieza F2: estado y fecha del test de nivel
+  testNivelEstado: "completado" | "omitido" | null;
+  testNivelFecha: string | null;   // ISO timestamp; null si nunca hizo el test o es anterior a esta versión
 };
 
 export type DetalleUsuario = {

@@ -698,6 +698,24 @@ function PanelDetalle({
                 )}
               </div>
             ))}
+            {/* Test de nivel */}
+            <div style={row}>
+              <span style={{ fontSize: 13, color: C.mute }}>Test de nivel</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {perfil.testNivelEstado === "completado" ? (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "#D1FAE5", color: "#065F46" }}>✓ hecho</span>
+                ) : perfil.testNivelEstado === "omitido" ? (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "#FEF3C7", color: "#92400E" }}>omitido</span>
+                ) : (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: C.surface, color: C.mute }}>pendiente</span>
+                )}
+                {perfil.testNivelFecha && (
+                  <span style={{ fontSize: 12, color: C.mute2 }}>
+                    {new Date(perfil.testNivelFecha).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
 
           {/* Bloques */}

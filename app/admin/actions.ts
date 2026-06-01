@@ -173,6 +173,8 @@ function construirDetallesPerfil(
     punteroBloque,
     enRepasoBloque,
     historialSesiones,
+    testNivelEstado: perfil.test_nivel_estado ?? null,
+    testNivelFecha: perfil.test_nivel_fecha ?? null,
   };
 }
 

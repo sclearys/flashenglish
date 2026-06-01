@@ -123,14 +123,22 @@ export function aplicarResultadoTest(estado: AppState, bloqueResultado: string):
 
 export function marcarTestCompletado(estado: AppState): AppState {
   const perfil = obtenerPerfilActivo(estado);
-  const nuevoEstado = actualizarPerfilActivo(estado, { ...perfil, test_nivel_estado: "completado" });
+  const nuevoEstado = actualizarPerfilActivo(estado, {
+    ...perfil,
+    test_nivel_estado: "completado",
+    test_nivel_fecha: new Date().toISOString(),
+  });
   guardarEstado(nuevoEstado);
   return nuevoEstado;
 }
 
 export function marcarTestOmitido(estado: AppState): AppState {
   const perfil = obtenerPerfilActivo(estado);
-  const nuevoEstado = actualizarPerfilActivo(estado, { ...perfil, test_nivel_estado: "omitido" });
+  const nuevoEstado = actualizarPerfilActivo(estado, {
+    ...perfil,
+    test_nivel_estado: "omitido",
+    test_nivel_fecha: new Date().toISOString(),
+  });
   guardarEstado(nuevoEstado);
   return nuevoEstado;
 }

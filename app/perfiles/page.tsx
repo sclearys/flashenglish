@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -30,6 +30,10 @@ export default function Perfiles() {
   const [colorSeleccionado, setColorSeleccionado] = useState<string>(COLORES_PERFIL[0]);
   const [emailCuenta, setEmailCuenta] = useState<string | null>(null);
   const [esModoInvitado, setEsModoInvitado] = useState(false);
+  // Evita que la descarga de Supabase sobreescriba el localStorage justo después
+  // de crear un perfil nuevo (race condition: la descarga empezó al montar pero
+  // resuelve después de la creación, machacando el nuevo perfil).
+  const perfilRecienCreado = useRef(false);
 
   useEffect(() => {
     const estadoCargado = cargarEstado();
@@ -63,6 +67,9 @@ export default function Perfiles() {
     // Si la nube está vacía pero hay progreso local (primer login),
     // subimos el estado local inmediatamente sin esperar ninguna acción del usuario.
     descargarEstado().then((estadoNube) => {
+      // Si se acaba de crear un perfil, ignoramos la descarga de Supabase:
+      // el estado de la nube es anterior a la creación y sobreescribiría el nuevo perfil.
+      if (perfilRecienCreado.current) return;
       if (estadoNube) {
         guardarEstadoLocal(estadoNube);
         setEstado(estadoNube);
@@ -135,6 +142,8 @@ export default function Perfiles() {
 
   function guardarNuevoPerfil() {
     if (!nombreInput.trim()) return;
+    // Marcar antes de crear para que la descarga pendiente de Supabase no machaque el nuevo perfil
+    perfilRecienCreado.current = true;
     const nuevoEstado = crearPerfil(estado!, nombreInput.trim(), colorSeleccionado);
     setEstado(nuevoEstado);
     sessionStorage.setItem("perfilSeleccionado", "1");
