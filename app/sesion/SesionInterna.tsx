@@ -16,7 +16,7 @@ import { temasARepasar } from "@/lib/stats";
 import { AppState, Frase, ResultadoEval, SesionEnCurso } from "@/lib/types";
 import FeedbackFallo from "@/components/FeedbackFallo";
 import { leerFraseEnIngles, detenerAudio, tieneWebSpeech } from "@/lib/audio";
-import type { ErrorSTT } from "@/lib/reconocimiento";
+type ErrorSTT = "no-speech" | "not-allowed" | "network" | "otro";
 import {
   tieneReconocimientoVoz,
   iniciarReconocimiento,
