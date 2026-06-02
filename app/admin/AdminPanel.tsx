@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { UsuarioResumen, PerfilResumen, DetalleUsuario, PerfilDetalle, ConsumoGlobal, SesionHistorial, FraseContenido, UsageStats } from "./types";
 import PanelSalud from "./contenido/PanelSalud";
@@ -798,12 +798,12 @@ function PanelDetalle({
                 const diffD = Math.floor(diffMs / 86400000);
                 const fechaTexto = diffH < 1 ? "< 1h" : diffH < 24 ? `${diffH}h` : `${diffD}d`;
                 return (
-                  <>
-                    <span key={`f-${s.id}`} style={{ fontSize: 12, color: C.ink2 }}>hace {fechaTexto}</span>
-                    <span key={`b-${s.id}`} style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: C.mute }}>{s.bloque}</span>
-                    <span key={`t-${s.id}`} style={{ fontSize: 12, textAlign: "right" }}>{s.frasesTotal}</span>
-                    <span key={`s-${s.id}`} style={{ fontSize: 12, textAlign: "right", color: s.frasesSaltadas > 0 ? C.amber : C.mute2 }}>{s.frasesSaltadas}</span>
-                  </>
+                  <React.Fragment key={s.id}>
+                    <span style={{ fontSize: 12, color: C.ink2 }}>hace {fechaTexto}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: C.mute }}>{s.bloque}</span>
+                    <span style={{ fontSize: 12, textAlign: "right" }}>{s.frasesTotal}</span>
+                    <span style={{ fontSize: 12, textAlign: "right", color: s.frasesSaltadas > 0 ? C.amber : C.mute2 }}>{s.frasesSaltadas}</span>
+                  </React.Fragment>
                 );
               })}
             </div>

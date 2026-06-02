@@ -16,6 +16,7 @@ import { temasARepasar } from "@/lib/stats";
 import { AppState, Frase, ResultadoEval, SesionEnCurso } from "@/lib/types";
 import FeedbackFallo from "@/components/FeedbackFallo";
 import { leerFraseEnIngles, detenerAudio, tieneWebSpeech } from "@/lib/audio";
+import type { ErrorSTT } from "@/lib/reconocimiento";
 import {
   tieneReconocimientoVoz,
   iniciarReconocimiento,
@@ -80,7 +81,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
   const [veredictoIA, setVeredictoIA] = useState<ResultadoEval | null>(null);
   const [transcripcionUsuario, setTranscripcionUsuario] = useState<string | null>(null);
   // true si el STT no pudo escuchar al usuario
-  const [errorGrabacion, setErrorGrabacion] = useState(false);
+  const [errorGrabacion, setErrorGrabacion] = useState<ErrorSTT | null>(null);
   // true si el usuario pidió autoevaluar manualmente tras un fallo del STT o la IA
   const [fallbackAutoeval, setFallbackAutoeval] = useState(false);
   // Mensaje de error de la IA (anillo de control de coste: cap, tutor desactivado, etc.)
@@ -362,7 +363,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
         setExplicacionIA(null);
         setTranscripcionUsuario(null);
         setEstadoGrabacion("idle");
-        setErrorGrabacion(false);
+        setErrorGrabacion(null);
         setFallbackAutoeval(false);
         setMensajeErrorIA(null);
       }
@@ -384,7 +385,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
     setExplicacionIA(null);
     setTranscripcionUsuario(null);
     setEstadoGrabacion("idle");
-    setErrorGrabacion(false);
+    setErrorGrabacion(null);
     setMensajeErrorIA(null);
     // Al retroceder en modo tutor, el usuario ya vio la respuesta correcta,
     // así que activamos el fallback para que se autoevalúe manualmente.
@@ -586,7 +587,10 @@ export default function SesionInterna({ tutorActivo }: Props) {
 
   function iniciarGrabacion() {
     if (estadoGrabacion !== "idle" || !fraseActual) return;
-    setErrorGrabacion(false);
+    // Detener el audio antes de grabar: en iOS, tener TTS y STT activos a la vez
+    // puede provocar que el reconocedor falle inmediatamente.
+    detenerAudio();
+    setErrorGrabacion(null);
     setTranscripcionUsuario(null);
     setEstadoGrabacion("grabando");
 
@@ -598,9 +602,9 @@ export default function SesionInterna({ tutorActivo }: Props) {
         setTranscripcionUsuario(texto);
         setEstadoGrabacion("confirmando");
       },
-      onError: () => {
+      onError: (tipoError: ErrorSTT) => {
         setEstadoGrabacion("idle");
-        setErrorGrabacion(true);
+        setErrorGrabacion(tipoError);
       },
       onEnd: () => {
         // No hacemos nada aquí; onResult u onError ya gestionaron el resultado.
@@ -629,7 +633,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
         };
         setMensajeErrorIA(mensajes[resultado.error] ?? "No se pudo evaluar. Autoevalúate tú.");
         setEstadoGrabacion("idle");
-        setErrorGrabacion(true);
+        setErrorGrabacion("otro");
       } else {
         setVeredictoIA(resultado.veredicto);
         setExplicacionIA(resultado.explicacion ?? null);
@@ -639,7 +643,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
     } catch {
       setMensajeErrorIA("No se pudo evaluar. Autoevalúate tú.");
       setEstadoGrabacion("idle");
-      setErrorGrabacion(true);
+      setErrorGrabacion("otro");
     }
   }
 
@@ -849,7 +853,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
               // No revelada: interfaz de grabación con paso de confirmación
               <>
                 {/* ── IDLE: botón circular de micrófono ── */}
-                {estadoGrabacion === "idle" && !errorGrabacion && (
+                {estadoGrabacion === "idle" && !errorGrabacion && (  // errorGrabacion es null cuando no hay error
                   <div className="w-full max-w-sm flex flex-col items-center gap-4 mt-2">
                     <p className="text-sm text-body text-center leading-snug">
                       Pulsa el botón, di la frase en inglés<br />y pulsa de nuevo para terminar
@@ -950,12 +954,18 @@ export default function SesionInterna({ tutorActivo }: Props) {
                 )}
 
                 {/* ── ERROR: STT no escuchó nada, o un anillo de control bloqueó la IA ── */}
-                {estadoGrabacion === "idle" && errorGrabacion && (
+                {estadoGrabacion === "idle" && errorGrabacion !== null && (
                   <div className="w-full max-w-sm flex flex-col gap-3 mt-3">
                     <p className="text-sm text-body text-center">
-                      {mensajeErrorIA ?? "No pude escucharte. ¿Volvemos a intentarlo?"}
+                      {mensajeErrorIA ?? (
+                        errorGrabacion === "not-allowed"
+                          ? "El micrófono no tiene permiso. Revisa los ajustes de Safari y vuelve a intentarlo."
+                          : errorGrabacion === "network"
+                          ? "Fallo de conexión. Safari necesita internet para transcribir voz. ¿Volvemos a intentarlo?"
+                          : "No pude escucharte. ¿Volvemos a intentarlo?"
+                      )}
                     </p>
-                    {!mensajeErrorIA && (
+                    {!mensajeErrorIA && errorGrabacion !== "not-allowed" && (
                       <button
                         onClick={iniciarGrabacion}
                         className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
@@ -966,7 +976,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
                     <button
                       onClick={() => {
                         setFallbackAutoeval(true);
-                        setErrorGrabacion(false);
+                        setErrorGrabacion(null);
                         setMensajeErrorIA(null);
                         setRevelada(true);
                       }}
