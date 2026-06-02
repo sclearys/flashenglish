@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Fondo blanco -->
+  <rect width="1200" height="630" fill="#FFFFFF"/>
+
+  <!-- Logo: círculo naranja con cuadrado redondeado blanco (viewBox 100x100 → escala a 160px) -->
+  <g transform="translate(520, 100) scale(1.6)">
+    <circle cx="50" cy="50" r="50" fill="#FF7A45"/>
+    <rect x="52" y="52" width="36" height="36" rx="8" ry="8" fill="white"/>
+  </g>
+
+  <!-- FlashEnglish -->
+  <text
+    x="600"
+    y="435"
+    text-anchor="middle"
+    font-family="DM Sans, system-ui, sans-serif"
+    font-size="72"
+    font-weight="700"
+    fill="#111827"
+    letter-spacing="-1"
+  >FlashEnglish</text>
+
+  <!-- Subtítulo -->
+  <text
+    x="600"
+    y="500"
+    text-anchor="middle"
+    font-family="DM Sans, system-ui, sans-serif"
+    font-size="28"
+    font-weight="400"
+    fill="#6B7280"
+  >Practica inglés oral cada día</text>
+</svg>

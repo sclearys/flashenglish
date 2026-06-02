@@ -16,12 +16,27 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "FlashEnglish",
-  description: "Practica traducción español → inglés con tarjetas",
+  description: "Practica inglés oral cada día",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "FlashEnglish",
+  },
+  openGraph: {
+    title: "FlashEnglish - GoToEnglish",
+    description: "Practica inglés oral cada día",
+    url: "https://flashenglish-zeta.vercel.app",
+    siteName: "FlashEnglish",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: "es_ES",
+    type: "website",
   },
 };
 
