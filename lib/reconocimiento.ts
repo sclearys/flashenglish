@@ -10,7 +10,7 @@ type ReconocedorVoz = {
   maxAlternatives: number;
   continuous: boolean;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: Event) => void) | null;
   onend: (() => void) | null;
   start(): void;
   stop(): void;
@@ -40,13 +40,20 @@ export function tieneReconocimientoVoz(): boolean {
   return !!(win.SpeechRecognition || win.webkitSpeechRecognition);
 }
 
+// Tipos de error que devuelve la Web Speech API.
+// "no-speech": el micrófono escuchó pero no detectó habla (más común en iOS Safari).
+// "not-allowed": el usuario no dio permiso de micrófono, o lo revocó.
+// "network": fallo de red (Safari envía el audio a servidores de Apple para transcribirlo).
+// "otro": cualquier otro error de la API.
+export type ErrorSTT = "no-speech" | "not-allowed" | "network" | "otro";
+
 interface OpcionesReconocimiento {
   /** Idioma del discurso a reconocer. Usar "en-US" para inglés americano. */
   lang: string;
   /** Se llama cuando el reconocedor transcribe algo con suficiente confianza. */
   onResult: (texto: string) => void;
   /** Se llama si no se detecta voz o hay un error de reconocimiento. */
-  onError: () => void;
+  onError: (tipoError: ErrorSTT) => void;
   /** Se llama cuando el reconocedor termina (haya resultado o no). */
   onEnd: () => void;
 }
@@ -58,7 +65,7 @@ interface OpcionesReconocimiento {
  */
 export function iniciarReconocimiento(opciones: OpcionesReconocimiento): void {
   if (!tieneReconocimientoVoz()) {
-    opciones.onError();
+    opciones.onError("otro");
     return;
   }
 
@@ -85,16 +92,23 @@ export function iniciarReconocimiento(opciones: OpcionesReconocimiento): void {
     }
   };
 
-  rec.onerror = () => {
+  rec.onerror = (event: Event) => {
     reconocedorActivo = null;
-    opciones.onError();
+    // Extraemos el código de error del evento para dar mensajes más útiles al usuario.
+    const codigo = (event as Event & { error?: string }).error ?? "";
+    const tipoError: ErrorSTT =
+      codigo === "no-speech"   ? "no-speech"   :
+      codigo === "not-allowed" ? "not-allowed" :
+      codigo === "network"     ? "network"     :
+      "otro";
+    opciones.onError(tipoError);
   };
 
   rec.onend = () => {
     reconocedorActivo = null;
-    // Si terminó sin resultado (silencio prolongado, etc.), avisar.
+    // Si terminó sin resultado y onerror no lo gestionó (silencio prolongado, etc.), avisar.
     if (!resultadoRecibido) {
-      opciones.onError();
+      opciones.onError("no-speech");
     }
     opciones.onEnd();
   };
