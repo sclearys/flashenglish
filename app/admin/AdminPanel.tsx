@@ -681,8 +681,8 @@ function PanelDetalle({
             onClick={() => onAction({
               titulo: sinLimiteDiario ? "Desactivar exención de límite" : "Activar sin límite diario",
               cuerpo: sinLimiteDiario
-                ? <span>Se volverá a aplicar el tope de 50 evaluaciones/día a <strong>{detalle.nombreDisplay}</strong>.</span>
-                : <span>No se aplicará el tope de 50 evaluaciones/día a <strong>{detalle.nombreDisplay}</strong>. Los anillos de bloqueo de cuenta y tutor desactivado siguen activos.</span>,
+                ? <span>Se volverá a aplicar el tope de {TOPE_DIARIO_EVALUACIONES} evaluaciones/día a <strong>{detalle.nombreDisplay}</strong>.</span>
+                : <span>No se aplicará el tope de {TOPE_DIARIO_EVALUACIONES} evaluaciones/día a <strong>{detalle.nombreDisplay}</strong>. Los anillos de bloqueo de cuenta y tutor desactivado siguen activos.</span>,
               confirmLabel: sinLimiteDiario ? "Desactivar" : "Activar",
               esPeligroso: false,
               onConfirm: async () => {
