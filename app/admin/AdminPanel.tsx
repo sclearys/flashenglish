@@ -7,6 +7,7 @@ import PanelSalud from "./contenido/PanelSalud";
 import ExplorarFrases from "./contenido/ExplorarFrases";
 import MapaMaestro from "./contenido/MapaMaestro";
 import AnadirFrase from "./contenido/AnadirFrase";
+import BarraOchoSegmentos from "../../components/BarraOchoSegmentos";
 import {
   obtenerDetalleUsuario,
   borrarSesionEnCurso,
@@ -721,6 +722,18 @@ function PanelDetalle({
           {/* Bloques */}
           <div style={card}>
             <div style={cardTitle}>Progreso por bloque</div>
+            {/* Barra visual de 8 segmentos — igual que ve el usuario en su home */}
+            <div style={{ marginBottom: 16 }}>
+              <BarraOchoSegmentos
+                segmentos={perfil.bloques.map((b) => ({
+                  codigo: b.cod,
+                  porcentaje: b.pct,
+                  esActivo: b.estado === "active",
+                  desbloqueado: b.estado !== "locked",
+                }))}
+                mostrarLabels={true}
+              />
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {perfil.bloques.map((b) => (
                 <div key={b.cod} style={{ display: "flex", alignItems: "center", gap: 10 }}>
