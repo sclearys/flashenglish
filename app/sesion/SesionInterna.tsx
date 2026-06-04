@@ -87,6 +87,8 @@ export default function SesionInterna({ tutorActivo }: Props) {
   // Mensaje de error de la IA (anillo de control de coste: cap, tutor desactivado, etc.)
   // Distinto de errorGrabacion, que es un fallo del STT.
   const [mensajeErrorIA, setMensajeErrorIA] = useState<string | null>(null);
+  // true si cap_diario fue alcanzado en esta sesión — todas las tarjetas siguientes usan autoevaluación silenciosa.
+  const [capDiarioSesion, setCapDiarioSesion] = useState(false);
   // Explicación gramatical devuelta por la IA junto al veredicto (Pieza G.2).
   const [explicacionIA, setExplicacionIA] = useState<string | null>(null);
 
@@ -625,13 +627,17 @@ export default function SesionInterna({ tutorActivo }: Props) {
         frase.id
       );
       if ("error" in resultado) {
+        const error = resultado.error;
         const mensajes: Record<string, string> = {
-          cap_diario:        "Has alcanzado el límite de evaluaciones de hoy. Autoevalúate tú.",
-          bloqueado:         "Esta cuenta no puede usar el tutor. Autoevalúate tú.",
-          tutor_desactivado: "El tutor está desactivado. Autoevalúate tú.",
-          no_autenticado:    "Sesión expirada. Vuelve a entrar e inténtalo de nuevo.",
+          cap_diario:        "Has completado la práctica con IA de hoy 🎉 Evalúate tú por ahora — mañana vuelve el tutor.",
+          bloqueado:         "El tutor no está disponible ahora mismo. Evalúate tú esta vez.",
+          tutor_desactivado: "El tutor está pausado en tu cuenta. Escríbeme si quieres reactivarlo.",
+          // no_autenticado: fallback silencioso — el usuario no puede hacer nada al respecto
         };
-        setMensajeErrorIA(mensajes[resultado.error] ?? "No se pudo evaluar. Autoevalúate tú.");
+        if (error === "cap_diario") setCapDiarioSesion(true);
+        if (error !== "no_autenticado") {
+          setMensajeErrorIA(mensajes[error] ?? "El tutor no está disponible ahora mismo. Evalúate tú esta vez.");
+        }
         setEstadoGrabacion("idle");
         setErrorGrabacion("otro");
       } else {
@@ -641,7 +647,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
         setEstadoGrabacion("idle");
       }
     } catch {
-      setMensajeErrorIA("No se pudo evaluar. Autoevalúate tú.");
+      setMensajeErrorIA("El tutor no está disponible ahora mismo. Evalúate tú esta vez.");
       setEstadoGrabacion("idle");
       setErrorGrabacion("otro");
     }
@@ -766,7 +772,7 @@ export default function SesionInterna({ tutorActivo }: Props) {
 
           {/* ── Controles según modo ─────────────────────────────────────── */}
 
-          {esTutor && !fallbackAutoeval ? (
+          {esTutor && !fallbackAutoeval && !capDiarioSesion ? (
             // ── MODO TUTOR ────────────────────────────────────────────────
             revelada && veredictoIA ? (
               // Veredicto recibido: bloque de resultado + botones
@@ -999,6 +1005,18 @@ export default function SesionInterna({ tutorActivo }: Props) {
               </button>
             ) : (
               <>
+                {/* Banner informativo cuando la IA falla (primera frase del error) */}
+                {mensajeErrorIA && (
+                  <div className="w-full max-w-sm rounded-xl border border-[#C77A11]/30 bg-[#FBF0DC] px-4 py-3 mb-3 text-sm text-[#5C3F00] leading-snug">
+                    {mensajeErrorIA}
+                  </div>
+                )}
+                {/* Chip pequeño en frases siguientes cuando cap_diario ya ocurrió */}
+                {!mensajeErrorIA && capDiarioSesion && (
+                  <p className="w-full max-w-sm text-[11px] text-mute mb-2 text-center">
+                    Modo autoevaluación — límite de IA alcanzado hoy
+                  </p>
+                )}
                 <p className="w-full max-w-sm text-eyebrow font-semibold text-mute mb-2">
                   ¿Cómo lo has hecho?
                 </p>

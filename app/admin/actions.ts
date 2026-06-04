@@ -506,6 +506,29 @@ export async function setTutorActivo(
 }
 
 /**
+ * Activa o desactiva la exención del límite diario de evaluaciones para un usuario.
+ * Con sin_limite_diario = true, el anillo 4 (cap diario) se omite para ese usuario.
+ */
+export async function setSinLimiteDiario(
+  userId: string,
+  valor: boolean
+): Promise<ResultadoAccion> {
+  if (!(await verificarAdmin())) return { ok: false, error: "No autorizado." };
+
+  const supabase = crearClienteAdmin();
+  const { error } = await supabase
+    .from("estado_usuario")
+    .update({ sin_limite_diario: valor })
+    .eq("cuenta_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    mensaje: valor ? "Sin límite diario activado." : "Sin límite diario desactivado.",
+  };
+}
+
+/**
  * Bloquea o desbloquea una cuenta de usuario.
  * Escribe directamente en la columna bloqueado de estado_usuario.
  */

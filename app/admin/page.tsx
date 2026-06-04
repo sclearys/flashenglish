@@ -57,7 +57,7 @@ export default async function AdminPage() {
   // ── 2. Leer todos los AppState de estado_usuario ─────────────────────────
   const { data: estados, error: estadosError } = await supabase
     .from("estado_usuario")
-    .select("cuenta_id, estado, actualizado_en, tutor_activo, bloqueado");
+    .select("cuenta_id, estado, actualizado_en, tutor_activo, bloqueado, sin_limite_diario");
 
   if (estadosError) {
     return (
@@ -72,19 +72,28 @@ export default async function AdminPage() {
     (estados ?? []).map((e) => [e.cuenta_id, e])
   );
 
-  // ── 3b. Leer evaluaciones del tutor de hoy ───────────────────────────────
+  // ── 3b. Leer evaluaciones del tutor (últimos 7 días) ────────────────────────
   const hoyISO = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const { data: evaluacionesHoyRows } = await supabase
+  const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data: evaluaciones7dias } = await supabase
     .from("evaluaciones_tutor")
-    .select("cuenta_id")
-    .gte("creado_en", `${hoyISO}T00:00:00.000Z`);
+    .select("cuenta_id, creado_en")
+    .gte("creado_en", `${hace7dias}T00:00:00.000Z`);
 
-  // Agrupar por usuario: Map<userId, count>
+  // Agrupar: Map<userId, count> solo para hoy (para el KPI global y el chip)
   const evalHoyPorUsuario = new Map<string, number>();
-  for (const row of evaluacionesHoyRows ?? []) {
-    evalHoyPorUsuario.set(row.cuenta_id, (evalHoyPorUsuario.get(row.cuenta_id) ?? 0) + 1);
+  // Agrupar: Map<userId, Map<fecha, count>> para los últimos 7 días
+  const evalPorDiaPorUsuario = new Map<string, Map<string, number>>();
+  for (const row of evaluaciones7dias ?? []) {
+    const fecha = (row.creado_en as string).slice(0, 10);
+    if (fecha === hoyISO) {
+      evalHoyPorUsuario.set(row.cuenta_id, (evalHoyPorUsuario.get(row.cuenta_id) ?? 0) + 1);
+    }
+    if (!evalPorDiaPorUsuario.has(row.cuenta_id)) evalPorDiaPorUsuario.set(row.cuenta_id, new Map());
+    const mapaDias = evalPorDiaPorUsuario.get(row.cuenta_id)!;
+    mapaDias.set(fecha, (mapaDias.get(fecha) ?? 0) + 1);
   }
-  const totalEvalHoy = evaluacionesHoyRows?.length ?? 0;
+  const totalEvalHoy = evaluaciones7dias?.filter((r) => (r.creado_en as string).slice(0, 10) === hoyISO).length ?? 0;
 
   // ── 3c. Leer historial de sesiones (Pieza H) ─────────────────────────────
   const { data: sesionesRows } = await supabase
@@ -131,6 +140,15 @@ export default async function AdminPage() {
       user.email?.split("@")[0] ||
       "—";
 
+    // Construir el array evaluacionesPorDia (últimos 7 días) para este usuario
+    const mapaDias = evalPorDiaPorUsuario.get(user.id);
+    const evaluacionesPorDia: { fecha: string; total: number }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const fechaStr = d.toISOString().slice(0, 10);
+      evaluacionesPorDia.push({ fecha: fechaStr, total: mapaDias?.get(fechaStr) ?? 0 });
+    }
+
     // Sin AppState: el usuario existe en auth pero nunca usó la app
     if (!appState?.perfiles) {
       return {
@@ -145,9 +163,11 @@ export default async function AdminPage() {
         tieneEstado: false,
         tutorActivo: estadoRow?.tutor_activo ?? true,
         bloqueado: estadoRow?.bloqueado ?? false,
+        sinLimiteDiario: estadoRow?.sin_limite_diario ?? false,
         evaluacionesHoy: evalHoyPorUsuario.get(user.id) ?? 0,
+        evaluacionesPorDia,
         sesionesTotal: sesionesPorCuenta.get(user.id) ?? 0,
-      } satisfies UsuarioResumen;  // perfiles vacíos → historialSesiones también vacío por defecto
+      } satisfies UsuarioResumen;
     }
 
     // Procesar cada perfil del AppState
@@ -190,7 +210,9 @@ export default async function AdminPage() {
       tieneEstado: true,
       tutorActivo: estadoRow?.tutor_activo ?? true,
       bloqueado: estadoRow?.bloqueado ?? false,
+      sinLimiteDiario: estadoRow?.sin_limite_diario ?? false,
       evaluacionesHoy: evalHoyPorUsuario.get(user.id) ?? 0,
+      evaluacionesPorDia,
       sesionesTotal: sesionesPorCuenta.get(user.id) ?? 0,
     } satisfies UsuarioResumen;
   });

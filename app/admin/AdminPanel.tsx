@@ -8,6 +8,7 @@ import ExplorarFrases from "./contenido/ExplorarFrases";
 import MapaMaestro from "./contenido/MapaMaestro";
 import AnadirFrase from "./contenido/AnadirFrase";
 import BarraOchoSegmentos from "../../components/BarraOchoSegmentos";
+import { TOPE_DIARIO_EVALUACIONES } from "../../lib/tutor";
 import {
   obtenerDetalleUsuario,
   borrarSesionEnCurso,
@@ -18,6 +19,7 @@ import {
   avanzarBloque,
   setTutorActivo,
   setBloqueado,
+  setSinLimiteDiario,
   eliminarCuenta,
 } from "./actions";
 
@@ -543,10 +545,70 @@ function SeccionAcciones({
   );
 }
 
+// ── Tabla de evaluaciones últimos 7 días ─────────────────────────────────────
+
+function TablaEvaluaciones({
+  dias,
+  sinLimiteDiario,
+}: {
+  dias: { fecha: string; total: number }[];
+  sinLimiteDiario: boolean;
+}) {
+  const TOPE = 50;
+  const maximo = Math.max(...dias.map((d) => d.total), sinLimiteDiario ? 0 : 1);
+  const escala = sinLimiteDiario ? Math.max(maximo, 1) : Math.max(maximo, TOPE);
+
+  function etiquetaDia(fechaISO: string, indice: number): string {
+    if (indice === 0) return "Hoy";
+    if (indice === 1) return "Ayer";
+    // Mostrar dd/mm para días más lejanos
+    const [, m, d] = fechaISO.split("-");
+    return `${d}/${m}`;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {dias.map((dia, i) => (
+        <div key={dia.fecha} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: C.mute, width: 36, textAlign: "right", flexShrink: 0 }}>
+            {etiquetaDia(dia.fecha, i)}
+          </span>
+          <div style={{ flex: 1, position: "relative", height: 10, background: C.surface, borderRadius: 4, overflow: "visible" }}>
+            {/* Barra de uso */}
+            {dia.total > 0 && (
+              <div style={{
+                position: "absolute", left: 0, top: 0, height: "100%",
+                width: `${Math.min(100, (dia.total / escala) * 100)}%`,
+                background: C.orange, borderRadius: 4,
+              }} />
+            )}
+            {/* Línea de referencia en el tope (solo si no es sin_limite_diario) */}
+            {!sinLimiteDiario && (
+              <div style={{
+                position: "absolute", top: -3, bottom: -3,
+                left: `${(TOPE / escala) * 100}%`,
+                width: 1, background: C.mute2,
+              }} />
+            )}
+          </div>
+          <span style={{ fontSize: 11, fontWeight: dia.total > 0 ? 700 : 400, color: dia.total > 0 ? C.ink : C.mute2, width: 24, textAlign: "right", flexShrink: 0 }}>
+            {dia.total}
+          </span>
+        </div>
+      ))}
+      {!sinLimiteDiario && (
+        <div style={{ fontSize: 10, color: C.mute2, textAlign: "right", marginTop: 2 }}>
+          línea = tope 50/día
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Panel de detalle ──────────────────────────────────────────────────────────
 
 function PanelDetalle({
-  detalle, onCerrar, onAction, userId, tutorActivoInicial, bloqueadoInicial, evaluacionesHoy,
+  detalle, onCerrar, onAction, userId, tutorActivoInicial, bloqueadoInicial, sinLimiteDiarioInicial, evaluacionesPorDia,
 }: {
   detalle: DetalleUsuario;
   onCerrar: () => void;
@@ -554,7 +616,8 @@ function PanelDetalle({
   userId: string;
   tutorActivoInicial: boolean;
   bloqueadoInicial: boolean;
-  evaluacionesHoy: number;
+  sinLimiteDiarioInicial: boolean;
+  evaluacionesPorDia: { fecha: string; total: number }[];
 }) {
   const [perfilIdx, setPerfilIdx] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -562,6 +625,7 @@ function PanelDetalle({
   // Estado local para las acciones de IA: se actualiza optimistamente sin reload de página.
   const [tutorActivo, setTutorActivoLocal] = useState(tutorActivoInicial);
   const [bloqueado, setBloqueadoLocal] = useState(bloqueadoInicial);
+  const [sinLimiteDiario, setSinLimiteDiarioLocal] = useState(sinLimiteDiarioInicial);
 
   useEffect(() => { panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [detalle.id]);
   useEffect(() => { setPerfilIdx(0); }, [detalle.id]);
@@ -588,34 +652,57 @@ function PanelDetalle({
       </div>
 
       {/* Barra de control de tutor IA */}
+      <div style={{ padding: "14px 24px", borderBottom: `1px solid ${C.surface}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.mute, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: 4 }}>Tutor IA</div>
+
+          {/* Toggle tutor activo */}
+          <button
+            onClick={() => onAction({
+              titulo: tutorActivo ? "Desactivar tutor" : "Activar tutor",
+              cuerpo: tutorActivo
+                ? <span>El botón &ldquo;Con tutor&rdquo; quedará <strong>deshabilitado</strong> para <strong>{detalle.nombreDisplay}</strong>. Podrá seguir usando la app en modo autoevaluación.</span>
+                : <span>El tutor virtual quedará <strong>activado</strong> de nuevo para <strong>{detalle.nombreDisplay}</strong>.</span>,
+              confirmLabel: tutorActivo ? "Desactivar" : "Activar",
+              esPeligroso: false,
+              onConfirm: async () => {
+                const r = await setTutorActivo(userId, !tutorActivo);
+                if (!r.ok) throw new Error(r.error);
+                setTutorActivoLocal(!tutorActivo);
+              },
+            })}
+            style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${tutorActivo ? C.green : C.line}`, background: tutorActivo ? C.greenBg : C.surface, color: tutorActivo ? C.green : C.mute }}
+          >
+            {tutorActivo ? "✓ Tutor activo" : "✗ Tutor off"}
+          </button>
+
+          {/* Toggle sin límite diario */}
+          <button
+            onClick={() => onAction({
+              titulo: sinLimiteDiario ? "Desactivar exención de límite" : "Activar sin límite diario",
+              cuerpo: sinLimiteDiario
+                ? <span>Se volverá a aplicar el tope de 50 evaluaciones/día a <strong>{detalle.nombreDisplay}</strong>.</span>
+                : <span>No se aplicará el tope de 50 evaluaciones/día a <strong>{detalle.nombreDisplay}</strong>. Los anillos de bloqueo de cuenta y tutor desactivado siguen activos.</span>,
+              confirmLabel: sinLimiteDiario ? "Desactivar" : "Activar",
+              esPeligroso: false,
+              onConfirm: async () => {
+                const r = await setSinLimiteDiario(userId, !sinLimiteDiario);
+                if (!r.ok) throw new Error(r.error);
+                setSinLimiteDiarioLocal(!sinLimiteDiario);
+              },
+            })}
+            style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sinLimiteDiario ? C.orange : C.line}`, background: sinLimiteDiario ? C.orangeBg : C.surface, color: sinLimiteDiario ? C.orange : C.mute }}
+          >
+            {sinLimiteDiario ? "∞ Sin límite" : "Límite 50/día"}
+          </button>
+        </div>
+
+        {/* Historial de evaluaciones últimos 7 días */}
+        <TablaEvaluaciones dias={evaluacionesPorDia} sinLimiteDiario={sinLimiteDiario} />
+      </div>
+
+      {/* Fila de acciones de cuenta: bloquear + eliminar */}
       <div style={{ padding: "14px 24px", borderBottom: `1px solid ${C.surface}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.mute, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: 4 }}>Tutor IA</div>
-
-        {/* Eval hoy */}
-        <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: evaluacionesHoy > 0 ? C.amberBg : C.surface, color: evaluacionesHoy > 0 ? C.amber : C.mute }}>
-          {evaluacionesHoy} eval. hoy
-        </span>
-
-        {/* Toggle tutor activo */}
-        <button
-          onClick={() => onAction({
-            titulo: tutorActivo ? "Desactivar tutor" : "Activar tutor",
-            cuerpo: tutorActivo
-              ? <span>El botón &ldquo;Con tutor&rdquo; quedará <strong>deshabilitado</strong> para <strong>{detalle.nombreDisplay}</strong>. Podrá seguir usando la app en modo autoevaluación.</span>
-              : <span>El tutor virtual quedará <strong>activado</strong> de nuevo para <strong>{detalle.nombreDisplay}</strong>.</span>,
-            confirmLabel: tutorActivo ? "Desactivar" : "Activar",
-            esPeligroso: false,
-            onConfirm: async () => {
-              const r = await setTutorActivo(userId, !tutorActivo);
-              if (!r.ok) throw new Error(r.error);
-              setTutorActivoLocal(!tutorActivo);
-            },
-          })}
-          style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${tutorActivo ? C.green : C.line}`, background: tutorActivo ? C.greenBg : C.surface, color: tutorActivo ? C.green : C.mute }}
-        >
-          {tutorActivo ? "✓ Tutor activo" : "✗ Tutor off"}
-        </button>
-
         {/* Toggle bloqueado */}
         <button
           onClick={() => onAction({
@@ -1034,7 +1121,7 @@ export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFr
                 num={consumoGlobal.totalHoy}
                 label={consumoGlobal.alerta ? "⚠️ Eval. IA hoy — ALERTA" : "Eval. IA hoy"}
                 color={consumoGlobal.alerta ? C.red : C.amber}
-                sub={`~€${consumoGlobal.costeEstimadoEurHoy.toFixed(3)} estimado`}
+                sub={`~€${consumoGlobal.costeEstimadoEurHoy.toFixed(3)} estimado · Tope: ${TOPE_DIARIO_EVALUACIONES}/día`}
               />
             </div>
 
@@ -1127,7 +1214,8 @@ export default function AdminPanel({ usuarios, consumoGlobal, frases, usagePorFr
                   userId={seleccionadoId}
                   tutorActivoInicial={usuarioSel?.tutorActivo ?? true}
                   bloqueadoInicial={usuarioSel?.bloqueado ?? false}
-                  evaluacionesHoy={usuarioSel?.evaluacionesHoy ?? 0}
+                  sinLimiteDiarioInicial={usuarioSel?.sinLimiteDiario ?? false}
+                  evaluacionesPorDia={usuarioSel?.evaluacionesPorDia ?? []}
                 />
               );
             })()}

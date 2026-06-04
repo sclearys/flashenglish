@@ -41,7 +41,9 @@ export type UsuarioResumen = {
   // Pieza G.4: control de coste del tutor virtual
   tutorActivo: boolean;             // admin puede desactivar el tutor para este usuario
   bloqueado: boolean;               // cuenta bloqueada
+  sinLimiteDiario: boolean;         // si true, no aplica el tope de 50 eval/día
   evaluacionesHoy: number;          // evaluaciones IA hechas hoy
+  evaluacionesPorDia: { fecha: string; total: number }[]; // últimos 7 días
   sesionesTotal: number;            // sesiones de bloque completadas (tabla sesiones)
 };
 

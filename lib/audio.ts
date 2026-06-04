@@ -18,13 +18,22 @@ export function leerFraseEnIngles(texto: string, onEnd?: () => void): void {
     return;
   }
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(texto);
-  utterance.lang = "en-GB";
-  utterance.rate = 0.9;
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
-  if (onEnd) utterance.onend = onEnd;
-  window.speechSynthesis.speak(utterance);
+  // Chrome pausa el motor de síntesis tras periodos de inactividad o al cancelar.
+  // resume() lo despierta; el setTimeout da tiempo al hilo de audio a estar listo.
+  window.speechSynthesis.resume();
+  setTimeout(() => {
+    if (!tieneWebSpeech()) {
+      onEnd?.();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = "en-GB";
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    if (onEnd) utterance.onend = onEnd;
+    window.speechSynthesis.speak(utterance);
+  }, 50);
 }
 
 // Detiene cualquier reproducción en curso. Útil al desmontar el componente

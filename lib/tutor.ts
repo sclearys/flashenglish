@@ -2,7 +2,7 @@
 // Fuente de verdad — no duplicar estos valores en ningún otro fichero.
 
 /** Número máximo de evaluaciones IA que un usuario puede hacer en un día natural. */
-export const TOPE_DIARIO_EVALUACIONES = 50;
+export const TOPE_DIARIO_EVALUACIONES = 100;
 
 /**
  * Si el total global de evaluaciones del día supera este umbral,

@@ -54,10 +54,10 @@ export async function evaluarConTutor(
   // ── Anillos 2, 3 y 4: consultas a la BD con cliente admin (bypassa RLS) ───
   const adminClient = crearClienteAdmin();
 
-  // Anillos 2 y 3: leer tutor_activo y bloqueado de estado_usuario
+  // Anillos 2, 3 y bypass de 4: leer tutor_activo, bloqueado y sin_limite_diario de estado_usuario
   const { data: estadoFila } = await adminClient
     .from("estado_usuario")
-    .select("tutor_activo, bloqueado")
+    .select("tutor_activo, bloqueado, sin_limite_diario")
     .eq("cuenta_id", user.id)
     .single();
 
@@ -65,15 +65,17 @@ export async function evaluarConTutor(
   // Si tutor_activo es null (columna aún no existe en la fila), tratamos como true.
   if (estadoFila?.tutor_activo === false) return { error: "tutor_desactivado" };
 
-  // Anillo 4: contar evaluaciones de hoy para este usuario
-  const hoyISO = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const { count } = await adminClient
-    .from("evaluaciones_tutor")
-    .select("id", { count: "exact", head: true })
-    .eq("cuenta_id", user.id)
-    .gte("creado_en", `${hoyISO}T00:00:00.000Z`);
+  // Anillo 4: contar evaluaciones de hoy — se omite si sin_limite_diario = true.
+  if (!estadoFila?.sin_limite_diario) {
+    const hoyISO = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const { count } = await adminClient
+      .from("evaluaciones_tutor")
+      .select("id", { count: "exact", head: true })
+      .eq("cuenta_id", user.id)
+      .gte("creado_en", `${hoyISO}T00:00:00.000Z`);
 
-  if ((count ?? 0) >= TOPE_DIARIO_EVALUACIONES) return { error: "cap_diario" };
+    if ((count ?? 0) >= TOPE_DIARIO_EVALUACIONES) return { error: "cap_diario" };
+  }
 
   // ── Llamada a Anthropic ────────────────────────────────────────────────────
   const prompt = `Eres un evaluador de inglés para una app de aprendizaje de idiomas.
