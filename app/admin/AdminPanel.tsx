@@ -554,7 +554,7 @@ function TablaEvaluaciones({
   dias: { fecha: string; total: number }[];
   sinLimiteDiario: boolean;
 }) {
-  const TOPE = 50;
+  const TOPE = TOPE_DIARIO_EVALUACIONES;
   const maximo = Math.max(...dias.map((d) => d.total), sinLimiteDiario ? 0 : 1);
   const escala = sinLimiteDiario ? Math.max(maximo, 1) : Math.max(maximo, TOPE);
 
@@ -598,7 +598,7 @@ function TablaEvaluaciones({
       ))}
       {!sinLimiteDiario && (
         <div style={{ fontSize: 10, color: C.mute2, textAlign: "right", marginTop: 2 }}>
-          línea = tope 50/día
+          línea = tope {TOPE_DIARIO_EVALUACIONES}/día
         </div>
       )}
     </div>
@@ -693,7 +693,7 @@ function PanelDetalle({
             })}
             style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${sinLimiteDiario ? C.orange : C.line}`, background: sinLimiteDiario ? C.orangeBg : C.surface, color: sinLimiteDiario ? C.orange : C.mute }}
           >
-            {sinLimiteDiario ? "∞ Sin límite" : "Límite 50/día"}
+            {sinLimiteDiario ? "∞ Sin límite" : `Límite ${TOPE_DIARIO_EVALUACIONES}/día`}
           </button>
         </div>
 
