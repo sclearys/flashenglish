@@ -64,6 +64,12 @@ export default function BarraOchoSegmentos({ segmentos, mostrarLabels = true }: 
                       className="h-full bg-brand-500 rounded-[4px] transition-all duration-[400ms] ease-out"
                       style={{ width: `${Math.max(pct, 8)}%` }}
                     />
+                  ) : pct > 0 ? (
+                    // Parcial: bloque inactivo con progreso (ej. saltado por test de nivel)
+                    <div
+                      className="h-full bg-brand-500 rounded-[4px]"
+                      style={{ width: `${pct}%` }}
+                    />
                   ) : null}
                 </div>
               );
