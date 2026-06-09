@@ -67,7 +67,7 @@ export default function Preferencias() {
       {/* Cabecera */}
       <div className="w-full max-w-sm flex items-center gap-4 mb-10">
         <button
-          onClick={() => router.push("/perfiles")}
+          onClick={() => router.push("/")}
           className="text-sm font-semibold text-brand-500 hover:text-brand-700 transition-colors"
         >
           &larr; Volver
