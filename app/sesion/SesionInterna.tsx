@@ -133,8 +133,23 @@ export default function SesionInterna({ tutorActivo }: Props) {
           perfil.sesion_en_curso.temaId === temaParam
         : perfil.sesion_en_curso.frases_ids[0].startsWith(perfil.bloque_activo + "-"));
 
-    const sesionActiva = sesionGuardadaValida
-      ? perfil.sesion_en_curso!
+    // Al rescatar una sesión guardada, eliminar frases ya evaluadas hoy para que no
+    // reaparezcan en una segunda sesión del mismo día (bug: ultima_vez de hoy en progreso_frases).
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    const sesionRescatada = sesionGuardadaValida
+      ? (() => {
+          const sesion = perfil.sesion_en_curso!;
+          const frasesFiltradas = sesion.frases_ids.filter((id) => {
+            const prog = perfil.progreso_frases[id];
+            return !prog || prog.ultima_vez.slice(0, 10) !== fechaHoy;
+          });
+          if (frasesFiltradas.length === 0) return null;
+          return { ...sesion, frases_ids: frasesFiltradas };
+        })()
+      : null;
+
+    const sesionActiva = sesionRescatada
+      ? sesionRescatada
       : esRefuerzo
       ? construirSesionRefuerzo(perfil, temaParam, tamanyoSesion)
       : construirSesion(perfil, tamanyoSesion);

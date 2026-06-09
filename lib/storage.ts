@@ -6,30 +6,10 @@ import { subirEstado } from "./nube";
 const STORAGE_KEY = "flashenglish.state";
 const VERSION = 2;
 
-const PERFIL_INICIAL: Perfil = {
-  nombre: "Yo",
-  creado: new Date().toISOString(),
-  racha_dias: 0,
-  ultima_sesion_fecha: null,
-  aciertos_totales: 0,
-  bloque_activo: "BASIC1",
-  bloques_desbloqueados: ["BASIC1"],
-  color_acento: "#FF7A45",
-  avatar: "default",
-  stats_dia: null,
-  puntero_frase_nueva: {
-    BASIC1: 0, BASIC2: 0,
-    INT1: 0, INT2: 0, INT3: 0, INT4: 0,
-    ADV1: 0, ADV2: 0,
-  },
-  progreso_frases: {},
-  sesion_en_curso: null,
-};
-
 const ESTADO_INICIAL: AppState = {
   version: VERSION,
-  perfil_activo: "perfil_1",
-  perfiles: { perfil_1: PERFIL_INICIAL },
+  perfil_activo: "",
+  perfiles: {},
 };
 
 export function cargarEstado(): AppState {
@@ -109,8 +89,16 @@ export function avanzarBloqueActivo(estado: AppState): AppState {
  */
 export function aplicarResultadoTest(estado: AppState, bloqueResultado: string): AppState {
   const perfil = obtenerPerfilActivo(estado);
-  const idx = BLOQUES_ORDENADOS.findIndex((b) => b.codigo === bloqueResultado);
-  const desbloqueados = BLOQUES_ORDENADOS.slice(0, idx + 1).map((b) => b.codigo);
+  const idxResultado = BLOQUES_ORDENADOS.findIndex((b) => b.codigo === bloqueResultado);
+  const idxActual = BLOQUES_ORDENADOS.findIndex((b) => b.codigo === perfil.bloque_activo);
+
+  // Si el resultado no supera el bloque actual, no se toca el progreso.
+  // test_nivel_estado se actualiza igualmente via marcarTestCompletado.
+  if (idxResultado <= idxActual) {
+    return estado;
+  }
+
+  const desbloqueados = BLOQUES_ORDENADOS.slice(0, idxResultado + 1).map((b) => b.codigo);
   const perfilActualizado: Perfil = {
     ...perfil,
     bloque_activo: bloqueResultado,

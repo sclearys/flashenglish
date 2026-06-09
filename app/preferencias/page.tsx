@@ -21,7 +21,6 @@ export default function Preferencias() {
   const [tutorPreferido, setTutorPreferido] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [mostrarModalTest, setMostrarModalTest] = useState(false);
-  const [testPendiente, setTestPendiente] = useState(false);
   const [nombrePerfil, setNombrePerfil] = useState("");
 
   useEffect(() => {
@@ -46,7 +45,6 @@ export default function Preferencias() {
       if (estado.tutorPreferido === false) setTutorPreferido(false);
 
       const perfil = obtenerPerfilActivo(estado);
-      setTestPendiente(!perfil.test_nivel_estado);
       setNombrePerfil(perfil.nombre);
 
       setCargando(false);
@@ -114,9 +112,8 @@ export default function Preferencias() {
         </p>
       </div>
 
-      {/* Seccion: Test de nivel (solo si no se ha hecho ni omitido) */}
-      {testPendiente && (
-        <div className="w-full max-w-sm flex flex-col gap-3 mt-6">
+      {/* Seccion: Test de nivel */}
+      <div className="w-full max-w-sm flex flex-col gap-3 mt-6">
           <button
             onClick={() => setMostrarModalTest(true)}
             className="bg-brand-50 rounded-lg px-[14px] py-[18px] flex items-center justify-between gap-4 w-full text-left hover:bg-brand-100 transition-colors"
@@ -131,8 +128,7 @@ export default function Preferencias() {
               <path d="M9 18l6-6-6-6"/>
             </svg>
           </button>
-        </div>
-      )}
+      </div>
 
       {/* Modal confirmacion test de nivel */}
       {mostrarModalTest && (

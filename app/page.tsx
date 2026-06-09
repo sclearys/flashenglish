@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cargarEstado, guardarEstadoLocal, obtenerPerfilActivo } from "@/lib/storage";
 import { descargarEstado } from "@/lib/nube";
+import { crearClienteSupabase } from "@/lib/supabase";
+import Link from "next/link";
 import { calcularStats } from "@/lib/stats";
 import { BLOQUES_ORDENADOS, porcentajeBloque } from "@/lib/catalogo";
 import { hayFrasesDisponibles, contarRepasoMañana } from "@/lib/sesion";
@@ -13,6 +15,7 @@ import BarraOchoSegmentos from "@/components/BarraOchoSegmentos";
 export default function Inicio() {
   const router = useRouter();
   const [estado, setEstado] = useState<AppState | null>(null);
+  const [emailCuenta, setEmailCuenta] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionStorage.getItem("perfilSeleccionado")) {
@@ -22,6 +25,12 @@ export default function Inicio() {
 
     // 1. Carga inmediata desde localStorage (síncrono, sin esperar red)
     setEstado(cargarEstado());
+
+    // Detectar si el usuario está autenticado para mostrar el icono de preferencias
+    const supabase = crearClienteSupabase();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setEmailCuenta(user.email);
+    });
 
     // 2. Sincronizar desde Supabase en segundo plano
     descargarEstado().then((estadoNube) => {
@@ -78,18 +87,29 @@ export default function Inicio() {
 
         {/* Cabecera: perfil activo + racha */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={irAPerfiles}
-            className="flex items-center gap-2 hover:opacity-75 transition-opacity"
-          >
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
-              style={{ background: perfil.color_acento }}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={irAPerfiles}
+              className="flex items-center gap-2 hover:opacity-75 transition-opacity"
             >
-              {perfil.nombre[0].toUpperCase()}
-            </div>
-            <span className="text-[18px] font-semibold text-ink">{perfil.nombre}</span>
-          </button>
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+                style={{ background: perfil.color_acento }}
+              >
+                {perfil.nombre[0].toUpperCase()}
+              </div>
+              <span className="text-[18px] font-semibold text-ink">{perfil.nombre}</span>
+            </button>
+            {emailCuenta && (
+              <Link
+                href="/preferencias"
+                className="text-lg text-mute hover:text-body transition-colors leading-none"
+                title="Preferencias"
+              >
+                ⚙
+              </Link>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 bg-brand-50 rounded-full px-3 py-1">
             <span className="text-base">🔥</span>
             <span className="text-sm font-semibold text-ink tabular-nums">

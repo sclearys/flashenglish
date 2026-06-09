@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   cargarEstado,
   cambiarPerfilActivo,
@@ -38,6 +37,13 @@ export default function Perfiles() {
   useEffect(() => {
     const estadoCargado = cargarEstado();
     setEstado(estadoCargado);
+
+    // Si no hay ningún perfil, ir directamente a crear
+    if (Object.keys(estadoCargado.perfiles).length === 0) {
+      setColorSeleccionado(COLORES_PERFIL[0]);
+      setNombreInput("");
+      setModo("crear");
+    }
 
     // Detectar si el usuario entró sin cuenta (cookie modo_invitado)
     setEsModoInvitado(document.cookie.includes("modo_invitado=1"));
@@ -192,12 +198,14 @@ export default function Perfiles() {
 
           {/* Header */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => { setModo("selector"); setPerfilEditandoId(null); }}
-              className="text-sm font-semibold text-brand-500 hover:text-brand-700 transition-colors"
-            >
-              ← Volver
-            </button>
+            {(esEditar || perfilesArray.length > 0) && (
+              <button
+                onClick={() => { setModo("selector"); setPerfilEditandoId(null); }}
+                className="text-sm font-semibold text-brand-500 hover:text-brand-700 transition-colors"
+              >
+                ← Volver
+              </button>
+            )}
             <h1 className="text-[18px] font-semibold text-ink">
               {esEditar ? "Editar perfil" : "Nuevo perfil"}
             </h1>
@@ -312,21 +320,12 @@ export default function Perfiles() {
         {emailCuenta ? (
           <div className="w-full flex items-center justify-between">
             <span className="text-xs text-mute truncate max-w-[200px]">{emailCuenta}</span>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/preferencias"
-                className="text-2xl text-mute hover:text-body transition-colors leading-none"
-                title="Preferencias"
-              >
-                ⚙
-              </Link>
-              <button
-                onClick={cerrarSesion}
-                className="text-xs font-medium text-body hover:text-ink transition-colors"
-              >
-                Cerrar sesión
-              </button>
-            </div>
+            <button
+              onClick={cerrarSesion}
+              className="text-xs font-medium text-body hover:text-ink transition-colors"
+            >
+              Cerrar sesión
+            </button>
           </div>
         ) : esModoInvitado ? (
           <div className="w-full flex items-center justify-between">

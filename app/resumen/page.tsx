@@ -226,7 +226,7 @@ export default function Resumen() {
           ) : (
             <>
               <button
-                onClick={() => router.push("/sesion?frases=25&nueva=1")}
+                onClick={() => router.push("/sesion?frases=15&nueva=1")}
                 className="w-full h-12 rounded-md bg-brand-500 text-white text-sm font-semibold hover:brightness-95 transition-all"
               >
                 Otra sesión →
